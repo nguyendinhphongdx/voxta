@@ -22,4 +22,7 @@ export interface VoiceBackendConnector {
   close(): void;
   readonly inputSampleRate: number;
   readonly outputSampleRate: number;
+  /** true nếu connector tự quản lý mic/loa của nó (vd qua Web Speech API) — CallScreen/useVoiceCall
+   * không mở MicCapture/AudioPlayer chung nữa, để tránh 2 bên cùng giữ mic. */
+  readonly managesOwnAudio: boolean;
 }

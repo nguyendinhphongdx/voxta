@@ -25,6 +25,7 @@ export interface UltronBackendConfig {
 export class UltronConnector implements VoiceBackendConnector {
   readonly inputSampleRate = CAPTURE_SAMPLE_RATE;
   readonly outputSampleRate = PLAYBACK_SAMPLE_RATE;
+  readonly managesOwnAudio = false;
 
   private ws: WebSocket | null = null;
   private handlers = new Set<(event: VoiceEvent) => void>();
