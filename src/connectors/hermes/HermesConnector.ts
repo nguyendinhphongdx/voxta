@@ -1,0 +1,396 @@
+import { MicVAD } from '@ricky0123/vad-web';
+
+import type { VoiceBackendConnector, VoiceEvent } from '../types';
+
+// Pin đúng version — asset (model ONNX + wasm) tải từ CDN jsdelivr theo version này, lệch
+// version base package/asset dễ vỡ (API/format model đổi giữa các bản).
+const VAD_WEB_VERSION = '0.0.31';
+const ONNXRUNTIME_WEB_VERSION = '1.22.0';
+
+/** Web Speech API không có type chuẩn trong lib.dom.d.ts — khai báo tối thiểu phần dùng tới. */
+interface SpeechRecognitionResultLike {
+  isFinal: boolean;
+  [index: number]: { transcript: string };
+}
+interface SpeechRecognitionEventLike extends Event {
+  results: ArrayLike<SpeechRecognitionResultLike>;
+  resultIndex: number;
+}
+interface SpeechRecognitionErrorEventLike extends Event {
+  error: string;
+}
+interface SpeechRecognitionLike extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+}
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
+function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
+  const w = window as unknown as {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+export interface HermesBackendConfig {
+  /** Base URL của Hermes Gateway API (OpenAI-compatible), vd http://localhost:8642. */
+  gatewayUrl: string;
+  /** `API_SERVER_KEY` cấu hình trên Hermes — gửi qua header `Authorization: Bearer`. */
+  apiKey: string;
+  /** Tên model Hermes route tới (theo cấu hình model của profile) — để trống dùng mặc định server. */
+  model: string;
+  /** Ngôn ngữ cho SpeechRecognition/SpeechSynthesis (BCP-47), vd "vi-VN". */
+  language: string;
+  /** 'browser' đọc bằng SpeechSynthesis miễn phí có sẵn (chất lượng thấp); 'openai'/'google' gọi
+   * TTS thật qua proxy server `/api/tts` (key không lộ ra browser — xem route đó). */
+  ttsProvider: 'browser' | 'openai' | 'google';
+}
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+/** Tách các câu ĐÃ hoàn chỉnh (kết thúc bằng . ! ? … theo sau khoảng trắng thật — không tính hết
+ * chuỗi hiện tại là "hoàn chỉnh" vì stream có thể tiếp tục ở delta kế tiếp) ra khỏi phần đuôi còn
+ * dang dở. Dùng để đọc từng câu ngay khi có, thay vì chờ hết cả câu trả lời mới đọc. */
+function extractCompleteSentences(text: string): { sentences: string[]; rest: string } {
+  const sentences: string[] = [];
+  const regex = /[^.!?…]*[.!?…]+\s+/g;
+  let match: RegExpExecArray | null;
+  let consumedLength = 0;
+  while ((match = regex.exec(text)) !== null) {
+    sentences.push(match[0].trim());
+    consumedLength = regex.lastIndex;
+  }
+  return { sentences, rest: text.slice(consumedLength) };
+}
+
+/** Sau khi VAD báo hết nói, chờ thêm chút cho SpeechRecognition (STT) kịp bắt từ cuối cùng —
+ * VAD (dựa trên audio) và STT (dựa trên ngôn ngữ) không tuyệt đối đồng bộ với nhau. */
+const VAD_COMMIT_GRACE_MS = 250;
+
+/** Connector cho Hermes Agent (Gateway API OpenAI-compatible, thuần HTTP text-in/text-out).
+ * Không có voice model native nên connector tự ghép 2 việc trong trình duyệt: SpeechRecognition
+ * chỉ để LẤY CHỮ (transcript liên tục, không tự quyết định lúc nào xong), còn việc PHÁT HIỆN
+ * "người dùng đã nói xong" giao cho `@ricky0123/vad-web` (Silero VAD thật, ML-based) qua
+ * `onSpeechEnd` — chính xác và nhanh hơn hẳn so với chờ trình duyệt tự chốt `isFinal` (có lúc mất
+ * vài giây) hay đếm giờ cứng. TTS đọc trả lời bằng SpeechSynthesis hoặc TTS thật (OpenAI/Google)
+ * tuỳ cấu hình. `managesOwnAudio = true` vì cả STT lẫn VAD tự giữ mic riêng — useVoiceCall không
+ * mở thêm MicCapture/AudioPlayer chung nữa. Lưu ý: VAD tải model ONNX từ CDN jsdelivr lúc
+ * `connect()` — cần Internet ở bước đó (khác các phần còn lại của voxta vốn chạy được hoàn toàn
+ * trong mạng LAN). Trong lúc TTS đang đọc, tạm dừng cả STT lẫn VAD để mic không tự bắt lại tiếng
+ * loa (không có echo cancellation giữa SpeechSynthesis/`<audio>` và mic). */
+export class HermesConnector implements VoiceBackendConnector {
+  readonly inputSampleRate = 0;
+  readonly outputSampleRate = 0;
+  readonly managesOwnAudio = true;
+
+  private readonly config: HermesBackendConfig;
+  private handlers = new Set<(event: VoiceEvent) => void>();
+  private history: ChatMessage[] = [];
+  private recognition: SpeechRecognitionLike | null = null;
+  private micVad: MicVAD | null = null;
+  private shouldListen = false;
+  private closed = false;
+  private activeAudio: HTMLAudioElement | null = null;
+  private pendingTranscript = '';
+  /** Hàng đợi câu chờ phát — mỗi câu vào hàng đợi là bắt đầu fetch TTS NGAY (không chờ tới lượt
+   * phát), nên khi câu trước phát xong, audio câu sau thường đã sẵn sàng — không có khoảng lặng
+   * chờ mạng giữa các câu. `audio` là `null` cho ttsProvider 'browser' (SpeechSynthesis không
+   * cần prefetch, tự nhận text). Xem `enqueueSpeech`/`drainSpeechQueue`. */
+  private speechQueue: Array<{ text: string; audio: Promise<Blob> | null }> = [];
+  private speaking = false;
+  /** true từ lúc 1 lượt được chốt (VAD onSpeechEnd hoặc isFinal) tới lúc resumeListening() —
+   * chặn onresult xử lý lần 2: gọi recognition.stop() để tạm dừng nghe khiến trình duyệt bắn
+   * thêm 1 `onresult` isFinal "dọn dẹp" cho CÙNG câu vừa chốt, nếu không chặn sẽ gửi request
+   * trùng (đã gặp thật khi test). */
+  private utteranceInFlight = false;
+
+  constructor(config: HermesBackendConfig) {
+    this.config = config;
+  }
+
+  private emit(event: VoiceEvent): void {
+    for (const handler of this.handlers) handler(event);
+  }
+
+  on(handler: (event: VoiceEvent) => void): () => void {
+    this.handlers.add(handler);
+    return () => this.handlers.delete(handler);
+  }
+
+  async connect(): Promise<void> {
+    const Recognition = getSpeechRecognitionCtor();
+    if (!Recognition) {
+      throw new Error(
+        'Trình duyệt này không hỗ trợ nhận dạng giọng nói (Web Speech API) — cần Chrome/Edge.',
+      );
+    }
+
+    const recognition = new Recognition();
+    recognition.continuous = true;
+    // interimResults=true để tự theo dõi lúc nào ngừng có update mới (xem `resetSettleTimer`)
+    // thay vì chờ trình duyệt tự chốt `isFinal` — cách đó có thể mất vài giây mới xong.
+    recognition.interimResults = true;
+    recognition.lang = this.config.language;
+
+    // Chỉ để LẤY CHỮ liên tục — không tự quyết định lúc nào "xong", VAD lo việc đó (xem dưới).
+    recognition.onresult = (event) => {
+      if (this.utteranceInFlight) return;
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        this.pendingTranscript = result[0]?.transcript ?? '';
+        if (result.isFinal) {
+          // Trình duyệt tự chốt xong trước cả VAD (câu ngắn) — dùng luôn, khỏi chờ thêm.
+          const text = this.pendingTranscript.trim();
+          this.pendingTranscript = '';
+          if (text) void this.handleUserUtterance(text);
+        }
+      }
+    };
+    recognition.onerror = (event) => {
+      // "no-speech"/"aborted" là chuyện bình thường của chế độ continuous (im lặng quá lâu,
+      // hay do chính mình gọi stop() để tạm dừng khi TTS đọc) — onend lo việc khởi động lại.
+      if (event.error === 'no-speech' || event.error === 'aborted') return;
+      this.emit({ type: 'error', message: `Lỗi nhận dạng giọng nói: ${event.error}` });
+    };
+    recognition.onend = () => {
+      if (this.shouldListen && !this.closed) {
+        try {
+          recognition.start();
+        } catch {
+          // Đã start rồi (race hiếm) — bỏ qua, lần onend kế tiếp sẽ tự thử lại.
+        }
+      }
+    };
+
+    this.recognition = recognition;
+
+    try {
+      this.micVad = await MicVAD.new({
+        onSpeechEnd: () => this.onVadSpeechEnd(),
+        onnxWASMBasePath: `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ONNXRUNTIME_WEB_VERSION}/dist/`,
+        baseAssetPath: `https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@${VAD_WEB_VERSION}/dist/`,
+      });
+    } catch (err) {
+      throw new Error(
+        `Không khởi tạo được VAD (@ricky0123/vad-web): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    this.shouldListen = true;
+    recognition.start();
+    this.micVad.start();
+    this.emit({ type: 'state', value: 'listening' });
+  }
+
+  /** VAD (audio) báo hết nói — chờ chút cho STT (ngôn ngữ) kịp bắt từ cuối rồi mới chốt câu. */
+  private onVadSpeechEnd(): void {
+    if (this.utteranceInFlight) return;
+    setTimeout(() => {
+      if (this.utteranceInFlight) return;
+      const text = this.pendingTranscript.trim();
+      this.pendingTranscript = '';
+      if (text) void this.handleUserUtterance(text);
+    }, VAD_COMMIT_GRACE_MS);
+  }
+
+  private async handleUserUtterance(text: string): Promise<void> {
+    if (this.utteranceInFlight) return;
+    this.utteranceInFlight = true;
+    this.emit({ type: 'transcript-delta', role: 'user', text });
+    this.history.push({ role: 'user', content: text });
+
+    // Tạm dừng nghe (cả STT lẫn VAD) trong lúc chờ + đọc trả lời — tránh mic tự bắt lại tiếng
+    // loa (không có echo cancellation giữa SpeechSynthesis/`<audio>` và mic).
+    this.shouldListen = false;
+    this.recognition?.stop();
+    this.micVad?.pause();
+    this.emit({ type: 'state', value: 'thinking' });
+
+    try {
+      await this.streamReply();
+    } catch (err) {
+      this.emit({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Không gọi được Hermes.',
+      });
+    }
+  }
+
+  /** Gọi Hermes ở chế độ `stream: true` và đọc từng câu ngay khi đủ dấu câu — không chờ cả câu
+   * trả lời xong mới bắt đầu đọc (khác `speak()` cũ, đọc 1 phát toàn bộ). */
+  private async streamReply(): Promise<void> {
+    const res = await fetch(`${this.config.gatewayUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.config.apiKey}`,
+      },
+      body: JSON.stringify({ model: this.config.model, messages: this.history, stream: true }),
+    });
+    if (!res.ok || !res.body) throw new Error(`Hermes gateway lỗi (HTTP ${res.status})`);
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullReply = '';
+    let sentenceBuffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? ''; // dòng cuối có thể bị cắt giữa chừng — giữ lại chờ chunk sau
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const payload = trimmed.slice(5).trim();
+        if (payload === '[DONE]') continue;
+
+        let json: { choices?: Array<{ delta?: { content?: string } }> };
+        try {
+          json = JSON.parse(payload) as typeof json;
+        } catch {
+          continue; // dòng SSE lỗi/không đầy đủ — bỏ qua, không phải lỗi fatal
+        }
+        const delta = json.choices?.[0]?.delta?.content ?? '';
+        if (!delta) continue;
+
+        fullReply += delta;
+        sentenceBuffer += delta;
+        this.emit({ type: 'transcript-delta', role: 'model', text: delta });
+
+        const { sentences, rest } = extractCompleteSentences(sentenceBuffer);
+        sentenceBuffer = rest;
+        for (const sentence of sentences) this.enqueueSpeech(sentence);
+      }
+    }
+
+    this.enqueueSpeech(sentenceBuffer); // câu cuối thường không có khoảng trắng theo sau
+    this.history.push({ role: 'assistant', content: fullReply });
+    // Reply rỗng hoàn toàn (không câu nào được enqueue) — không gì kích hoạt resumeListening
+    // qua playNextInQueue nữa, phải tự gọi.
+    if (!this.speaking && this.speechQueue.length === 0) this.resumeListening();
+  }
+
+  private enqueueSpeech(text: string): void {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const audio = this.config.ttsProvider === 'browser' ? null : this.fetchTtsAudio(trimmed);
+    this.speechQueue.push({ text: trimmed, audio });
+    if (!this.speaking) void this.drainSpeechQueue();
+  }
+
+  /** Phát lần lượt từng câu trong hàng đợi — audio (nếu có) đã được fetch song song từ lúc
+   * enqueue nên `await item.audio` ở đây thường trả về ngay lập tức, không có khoảng lặng chờ
+   * mạng giữa các câu. */
+  private async drainSpeechQueue(): Promise<void> {
+    if (this.speaking || this.closed) return;
+    this.speaking = true;
+
+    while (this.speechQueue.length > 0) {
+      const item = this.speechQueue.shift();
+      if (!item) break;
+      this.emit({ type: 'state', value: 'speaking' });
+
+      try {
+        if (item.audio) {
+          await this.playBlob(await item.audio);
+        } else {
+          await this.playBrowserUtterance(item.text);
+        }
+      } catch (err) {
+        this.emit({
+          type: 'error',
+          message: err instanceof Error ? err.message : 'Không đọc được trả lời (TTS).',
+        });
+        return; // emit('error') đã đóng connector (xem useCallStore) — dừng hẳn, không phát tiếp
+      }
+
+      if (this.closed) return;
+    }
+
+    this.speaking = false;
+    this.resumeListening();
+  }
+
+  /** TTS thật (OpenAI/Google) qua proxy server — key được đọc từ Settings phía server, không bao
+   * giờ gửi tới đây. Gọi ngay lúc enqueue (không chờ tới lượt phát) để prefetch. */
+  private async fetchTtsAudio(text: string): Promise<Blob> {
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? `TTS lỗi (HTTP ${res.status})`);
+    }
+    return res.blob();
+  }
+
+  private playBlob(blob: Blob): Promise<void> {
+    return new Promise((resolve) => {
+      const audio = new Audio(URL.createObjectURL(blob));
+      audio.onended = () => resolve();
+      audio.onerror = () => resolve();
+      this.activeAudio = audio;
+      void audio.play().catch(() => resolve());
+    });
+  }
+
+  private playBrowserUtterance(text: string): Promise<void> {
+    return new Promise((resolve) => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = this.config.language;
+      utterance.onend = () => resolve();
+      utterance.onerror = () => resolve();
+      window.speechSynthesis.speak(utterance);
+    });
+  }
+
+  private resumeListening(): void {
+    if (this.closed) return;
+    this.utteranceInFlight = false;
+    this.shouldListen = true;
+    this.emit({ type: 'state', value: 'listening' });
+    try {
+      this.recognition?.start();
+    } catch {
+      // Đã đang chạy — bỏ qua.
+    }
+    this.micVad?.start();
+  }
+
+  /** No-op: HermesConnector tự bắt audio qua SpeechRecognition (managesOwnAudio), không nhận
+   * PCM chunk từ MicCapture chung như UltronConnector. */
+  sendAudioChunk(): void {}
+
+  close(): void {
+    this.closed = true;
+    this.shouldListen = false;
+    this.utteranceInFlight = true;
+    this.pendingTranscript = '';
+    this.speechQueue = [];
+    this.speaking = false;
+    window.speechSynthesis.cancel();
+    this.activeAudio?.pause();
+    this.activeAudio = null;
+    this.recognition?.stop();
+    this.recognition = null;
+    this.micVad?.destroy();
+    this.micVad = null;
+    this.handlers.clear();
+  }
+}
