@@ -1,25 +1,25 @@
-import { useState } from 'react';
+'use client';
 
-import { CallScreen } from './screens/CallScreen';
-import { SettingsScreen } from './screens/SettingsScreen';
-import { loadSettings, saveSettings } from './lib/settings';
+import { useEffect, useState } from 'react';
+
+import { CallView } from './features/call/call-view';
+import { SettingsView } from './features/settings/settings-view';
+import { useSettingsStore } from './features/settings/store';
 
 export function App() {
-  const [settings, setSettings] = useState(loadSettings);
+  const loaded = useSettingsStore((s) => s.loaded);
+  const load = useSettingsStore((s) => s.load);
   const [showSettings, setShowSettings] = useState(false);
 
-  if (showSettings) {
-    return (
-      <SettingsScreen
-        settings={settings}
-        onSave={(next) => {
-          saveSettings(next);
-          setSettings(next);
-        }}
-        onClose={() => setShowSettings(false)}
-      />
-    );
-  }
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  return <CallScreen settings={settings} onOpenSettings={() => setShowSettings(true)} />;
+  if (!loaded) return null;
+
+  return showSettings ? (
+    <SettingsView onClose={() => setShowSettings(false)} />
+  ) : (
+    <CallView onOpenSettings={() => setShowSettings(true)} />
+  );
 }

@@ -1,29 +1,59 @@
-/** Settings lưu localStorage — voxta 1 người dùng, không có account/multi-tenant (giống Ultron). */
+/** Settings lưu qua SQLite (API `/api/settings`, xem `lib/db.ts`) — voxta 1 người dùng, không có
+ * account/multi-tenant. Trước đây dùng localStorage nhưng mỗi browser có 1 bản riêng, không đồng
+ * bộ giữa các browser/thiết bị cùng trỏ vào 1 server voxta. */
 
 export interface VoxtaSettings {
-  backend: 'ultron'; // Phase 1 chỉ có 1 backend — union mở rộng khi thêm Hermes (Phase 2)
+  backend: 'ultron' | 'hermes';
   apiBaseUrl: string;
   agentId: number | null;
+  /** Base URL của Hermes Gateway API (OpenAI-compatible), vd http://localhost:8642. */
+  hermesGatewayUrl: string;
+  /** `API_SERVER_KEY` cấu hình trên Hermes. */
+  hermesApiKey: string;
+  /** Tên model Hermes route tới — để trống dùng mặc định server. */
+  hermesModel: string;
+  /** Giọng đọc trả lời của HermesConnector — 'browser' dùng SpeechSynthesis miễn phí có sẵn
+   * trong trình duyệt (chất lượng thấp); 'openai'/'google' gọi TTS thật qua proxy server
+   * (`/api/tts`) để key không lộ ra browser. */
+  ttsProvider: 'browser' | 'openai' | 'google';
+  openaiApiKey: string;
+  openaiTtsModel: string;
+  openaiTtsVoice: string;
+  googleApiKey: string;
+  /** Tên giọng đầy đủ theo catalog Google, vd "vi-VN-Wavenet-A" — cũng dùng để suy ra
+   * languageCode (2 segment đầu). */
+  googleTtsVoice: string;
 }
 
-const STORAGE_KEY = 'voxta.settings.v1';
-
-const DEFAULT_SETTINGS: VoxtaSettings = {
+export const DEFAULT_SETTINGS: VoxtaSettings = {
   backend: 'ultron',
   apiBaseUrl: 'http://localhost:8000',
   agentId: null,
+  hermesGatewayUrl: 'http://localhost:8642',
+  hermesApiKey: '',
+  hermesModel: '',
+  ttsProvider: 'browser',
+  openaiApiKey: '',
+  openaiTtsModel: 'gpt-4o-mini-tts',
+  openaiTtsVoice: 'alloy',
+  googleApiKey: '',
+  googleTtsVoice: 'vi-VN-Wavenet-A',
 };
 
-export function loadSettings(): VoxtaSettings {
+export async function fetchSettings(): Promise<VoxtaSettings> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<VoxtaSettings>) };
+    const res = await fetch('/api/settings');
+    if (!res.ok) return DEFAULT_SETTINGS;
+    return { ...DEFAULT_SETTINGS, ...((await res.json()) as Partial<VoxtaSettings>) };
   } catch {
     return DEFAULT_SETTINGS;
   }
 }
 
-export function saveSettings(settings: VoxtaSettings): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+export async function saveSettings(settings: VoxtaSettings): Promise<void> {
+  await fetch('/api/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  });
 }
