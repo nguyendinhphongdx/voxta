@@ -3,7 +3,7 @@
  * bộ giữa các browser/thiết bị cùng trỏ vào 1 server voxta. */
 
 export interface VoxtaSettings {
-  backend: 'ultron' | 'hermes' | 'claude-code';
+  backend: 'ultron' | 'hermes' | 'claude-code' | 'tmux-agent';
   apiBaseUrl: string;
   agentId: number | null;
   /** Base URL của Hermes Gateway API (OpenAI-compatible), vd http://localhost:8642. */
@@ -20,6 +20,14 @@ export interface VoxtaSettings {
    * PATH của nvm chỉ được set qua rc file của shell tương tác, process không tương tác/không qua
    * shell login sẽ không thấy) — nếu vậy điền đường dẫn tuyệt đối (`which claude` để lấy). */
   claudeCodeBinaryPath: string;
+  /** Lệnh khởi động agent trong tmux — generic, không giới hạn Claude Code (vd "codex" hay
+   * "claude"). Khác `claudeCodeBinaryPath`: đây chạy TƯƠNG TÁC trong 1 pane thật, đọc bằng cách
+   * chụp màn hình (`lib/tmux-agent.ts`), không phải gọi flag JSON riêng như backend Claude Code
+   * headless — nên dùng được với BẤT KỲ CLI agent tương tác nào, đổi lại không streaming theo
+   * token thật (phải đợi màn hình đứng yên mới biết xong 1 lượt). */
+  tmuxAgentCommand: string;
+  /** Thư mục project agent trong tmux sẽ chạy trong đó. */
+  tmuxAgentProjectDir: string;
   /** Giọng đọc trả lời — dùng chung cho các backend chỉ có text (Hermes, Claude Code). 'browser'
    * dùng SpeechSynthesis miễn phí có sẵn trong trình duyệt (chất lượng thấp); 'openai'/'google'
    * gọi TTS thật qua proxy server (`/api/tts`) để key không lộ ra browser. */
@@ -42,6 +50,8 @@ export const DEFAULT_SETTINGS: VoxtaSettings = {
   hermesModel: '',
   claudeCodeProjectDir: '',
   claudeCodeBinaryPath: 'claude',
+  tmuxAgentCommand: 'codex',
+  tmuxAgentProjectDir: '',
   ttsProvider: 'browser',
   openaiApiKey: '',
   openaiTtsModel: 'gpt-4o-mini-tts',

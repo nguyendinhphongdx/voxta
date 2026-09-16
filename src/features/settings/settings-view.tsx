@@ -20,6 +20,7 @@ const BACKEND_LABEL: Record<VoxtaSettings['backend'], string> = {
   ultron: 'Ultron',
   hermes: 'Hermes Agent',
   'claude-code': 'Claude Code',
+  'tmux-agent': 'Terminal Agent (tmux)',
 };
 
 const TTS_PROVIDER_LABEL: Record<VoxtaSettings['ttsProvider'], string> = {
@@ -66,6 +67,8 @@ export function SettingsView({ onClose }: SettingsViewProps) {
   const [hermesModel, setHermesModel] = useState(settings.hermesModel);
   const [claudeCodeProjectDir, setClaudeCodeProjectDir] = useState(settings.claudeCodeProjectDir);
   const [claudeCodeBinaryPath, setClaudeCodeBinaryPath] = useState(settings.claudeCodeBinaryPath);
+  const [tmuxAgentCommand, setTmuxAgentCommand] = useState(settings.tmuxAgentCommand);
+  const [tmuxAgentProjectDir, setTmuxAgentProjectDir] = useState(settings.tmuxAgentProjectDir);
   const [ttsProvider, setTtsProvider] = useState(settings.ttsProvider);
   const [openaiApiKey, setOpenaiApiKey] = useState(settings.openaiApiKey);
   const [openaiTtsModel, setOpenaiTtsModel] = useState(settings.openaiTtsModel);
@@ -92,6 +95,8 @@ export function SettingsView({ onClose }: SettingsViewProps) {
       hermesModel: hermesModel.trim(),
       claudeCodeProjectDir: claudeCodeProjectDir.trim(),
       claudeCodeBinaryPath: claudeCodeBinaryPath.trim() || 'claude',
+      tmuxAgentCommand: tmuxAgentCommand.trim() || 'codex',
+      tmuxAgentProjectDir: tmuxAgentProjectDir.trim(),
       ttsProvider,
       openaiApiKey: openaiApiKey.trim(),
       openaiTtsModel,
@@ -126,6 +131,7 @@ export function SettingsView({ onClose }: SettingsViewProps) {
                 <SelectItem value="ultron">Ultron</SelectItem>
                 <SelectItem value="hermes">Hermes Agent</SelectItem>
                 <SelectItem value="claude-code">Claude Code</SelectItem>
+                <SelectItem value="tmux-agent">Terminal Agent (tmux)</SelectItem>
               </SelectContent>
             </Select>
           </SettingsField>
@@ -192,7 +198,32 @@ export function SettingsView({ onClose }: SettingsViewProps) {
             </>
           )}
 
-          {(backend === 'hermes' || backend === 'claude-code') && (
+          {backend === 'tmux-agent' && (
+            <>
+              <p className="rounded-md border border-muted-foreground/30 bg-muted p-3 text-sm text-muted-foreground">
+                Điều khiển 1 CLI agent tương tác thật (Codex, Claude Code...) bằng cách gõ phím +
+                đọc màn hình qua tmux — dùng được với bất kỳ CLI nào chạy trong terminal, nhưng
+                không đọc trả lời theo thời gian thực từng chữ được (phải đợi agent nói xong 1
+                lượt mới đọc).
+              </p>
+              <SettingsField label="Lệnh khởi động">
+                <Input
+                  value={tmuxAgentCommand}
+                  onChange={(e) => setTmuxAgentCommand(e.target.value)}
+                  placeholder="codex"
+                />
+              </SettingsField>
+              <SettingsField label="Project Directory">
+                <Input
+                  value={tmuxAgentProjectDir}
+                  onChange={(e) => setTmuxAgentProjectDir(e.target.value)}
+                  placeholder="/Users/ban/Code/du-an"
+                />
+              </SettingsField>
+            </>
+          )}
+
+          {(backend === 'hermes' || backend === 'claude-code' || backend === 'tmux-agent') && (
             <>
               <div className="border-t pt-5">
                 <SettingsField label="Giọng đọc trả lời">

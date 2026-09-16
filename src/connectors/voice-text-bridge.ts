@@ -370,5 +370,10 @@ export abstract class VoiceTextBridgeConnector implements VoiceBackendConnector 
     this.micVad?.destroy();
     this.micVad = null;
     this.handlers.clear();
+    this.onClose?.();
   }
+
+  /** Hook cho subclass dọn tài nguyên riêng khi cuộc gọi kết thúc (vd TmuxAgentConnector giết
+   * session tmux). Không bắt buộc override. */
+  protected onClose?(): void;
 }

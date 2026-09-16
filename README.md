@@ -12,7 +12,7 @@ chỉ một trải nghiệm gọi thoại tối giản, đứng trước nhiều
 - **1 nút, 3 trạng thái** — nghe / nghĩ / nói, thể hiện bằng orb phát sáng đổi màu + waveform,
   không cần giao diện chat.
 - **Backend-agnostic** — cùng 1 giao diện, đổi qua lại giữa nhiều agent platform mà không đổi UI.
-- **Ba backend đã hỗ trợ**:
+- **Bốn backend đã hỗ trợ**:
   - **Ultron** — relay đầy đủ qua WebSocket, backend tự giữ kết nối Gemini Live.
   - **Hermes Agent** — chỉ có Gateway API dạng text (OpenAI-compatible), nên voxta tự lo toàn bộ
     voice pipeline ở client: nhận diện giọng nói, phát hiện lúc dừng nói bằng VAD thật (không phải
@@ -20,6 +20,10 @@ chỉ một trải nghiệm gọi thoại tối giản, đứng trước nhiều
     (OpenAI, Google Cloud).
   - **Claude Code** — điều khiển 1 project code thật bằng giọng nói: server chạy `claude -p`
     headless như subprocess, voxta nói lại kết quả. Dùng chung voice pipeline với Hermes.
+  - **Terminal Agent (tmux)** — generic cho BẤT KỲ CLI agent tương tác nào (Codex, Claude Code,
+    Aider...): server tự mở 1 session tmux chạy agent đó, gõ/đọc màn hình thay vì dùng flag JSON
+    riêng của từng agent. Đổi lại không streaming theo token thật (phải đợi agent nói xong 1 lượt
+    mới đọc).
 - **Trả lời được đọc theo từng câu ngay khi model sinh ra** (streaming), audio của câu kế tiếp
   được tải trước trong lúc câu hiện tại đang phát — không có khoảng lặng chờ mạng giữa các câu.
 - **Cấu hình dùng chung mọi thiết bị** — lưu SQLite phía server thay vì `localStorage`, nên mở
@@ -53,7 +57,8 @@ src/
 │   ├── create-connector.ts    #   factory: settings -> connector cụ thể
 │   ├── ultron/                #   relay đầy đủ qua WebSocket
 │   ├── hermes/                #   HermesConnector — Gateway API OpenAI-compatible
-│   └── claude-code/           #   ClaudeCodeConnector — gọi `claude` CLI qua route nội bộ
+│   ├── claude-code/           #   ClaudeCodeConnector — gọi `claude` CLI qua route nội bộ
+│   └── tmux-agent/            #   TmuxAgentConnector — điều khiển agent bất kỳ qua tmux
 │
 ├── audio/                     # Mic capture (AudioWorklet) + playback streaming — dùng cho Ultron
 ├── components/ui/             # shadcn/ui primitives
@@ -127,8 +132,23 @@ Cần [Claude Code CLI](https://claude.com/claude-code) đã cài và đăng nh�
 Mỗi lượt nói là 1 lần gọi `claude -p` mới; lịch sử hội thoại trong **cùng 1 cuộc gọi** được nối
 bằng `--resume <session-id>` (session mới cho mỗi lần bấm nút gọi lại).
 
-**Giọng đọc trả lời** (chung cho Hermes và Claude Code — Ultron dùng thẳng voice model của Gemini
-Live):
+### Cấu hình Terminal Agent (tmux)
+
+Cần [tmux](https://github.com/tmux/tmux) đã cài trên máy chạy voxta, và CLI agent bạn muốn dùng
+(`codex`, `claude`...) đã cài + đăng nhập sẵn.
+
+| Field | Ghi chú |
+|---|---|
+| Lệnh khởi động | lệnh chạy trong tmux, vd `codex` hoặc `claude` |
+| Project Directory | thư mục agent sẽ chạy trong đó — bắt buộc |
+
+Mỗi cuộc gọi voxta tạo 1 session tmux mới (`voxta-<uuid>`), gõ tin nhắn bằng `tmux send-keys` và
+đọc trả lời bằng cách chụp màn hình (`tmux capture-pane`) rồi chờ màn hình "đứng yên" — không có
+event "đã xong" rõ ràng như JSON nên đây là cách suy luận tốt nhất có thể với raw terminal. Session
+tự đóng khi cuộc gọi kết thúc.
+
+**Giọng đọc trả lời** (chung cho Hermes, Claude Code và Terminal Agent — Ultron dùng thẳng voice
+model của Gemini Live):
 
 - **Trình duyệt** (mặc định) — miễn phí, dùng `SpeechSynthesis` có sẵn, chất lượng thấp.
 - **OpenAI TTS** — cần API key từ [platform.openai.com](https://platform.openai.com/api-keys).
@@ -138,8 +158,10 @@ Live):
 
 ## Giới hạn hiện tại
 
-- Backend Hermes và Claude Code chỉ chạy tốt trên **Chrome/Edge** (Web Speech API không được
-  Safari/Firefox hỗ trợ đầy đủ).
+- Backend Hermes, Claude Code và Terminal Agent chỉ chạy tốt trên **Chrome/Edge** (Web Speech API
+  không được Safari/Firefox hỗ trợ đầy đủ).
+- Terminal Agent không streaming theo token thật (phải chờ agent nói xong 1 lượt mới đọc) — đây là
+  giới hạn cố hữu của cách gõ/đọc màn hình, không phải bug.
 - VAD (`@ricky0123/vad-web`) tải model ONNX từ CDN lúc bắt đầu cuộc gọi — cần Internet ở bước đó,
   khác các phần còn lại của voxta vốn chạy được hoàn toàn trong mạng LAN.
 - Không backend nào hỗ trợ barge-in (ngắt lời model đang đọc) — mic tạm dừng trong lúc TTS phát để

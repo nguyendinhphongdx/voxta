@@ -1,5 +1,6 @@
 import { ClaudeCodeConnector } from './claude-code/ClaudeCodeConnector';
 import { HermesConnector } from './hermes/HermesConnector';
+import { TmuxAgentConnector } from './tmux-agent/TmuxAgentConnector';
 import { UltronConnector } from './ultron/UltronConnector';
 import type { VoiceBackendConnector } from './types';
 import type { VoxtaSettings } from '../lib/settings';
@@ -18,6 +19,9 @@ export function createConnector(settings: VoxtaSettings): VoiceBackendConnector 
   }
   if (settings.backend === 'claude-code') {
     return new ClaudeCodeConnector({ language: 'vi-VN', ttsProvider: settings.ttsProvider });
+  }
+  if (settings.backend === 'tmux-agent') {
+    return new TmuxAgentConnector({ language: 'vi-VN', ttsProvider: settings.ttsProvider });
   }
   return new UltronConnector({ apiBaseUrl: settings.apiBaseUrl, agentId: settings.agentId });
 }
