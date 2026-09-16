@@ -1,8 +1,9 @@
 'use client';
 
-import { Settings } from 'lucide-react';
+import { ArrowLeft, Settings } from 'lucide-react';
+import Link from 'next/link';
 
-import { Button } from '../../components/ui/button';
+import { buttonVariants } from '../../components/ui/button';
 import { useSettingsStore } from '../settings/store';
 import { CallOrb } from './components/call-orb';
 import { VoiceWave } from './components/voice-wave';
@@ -10,13 +11,9 @@ import { useCallLifecycle } from './hooks/use-call-lifecycle';
 import { useCallStore } from './store';
 import { STATE_LABEL, VOICE_COLOR_VAR, resolveVisual } from './visual';
 
-interface CallViewProps {
-  onOpenSettings: () => void;
-}
-
 /** Màn hình chính — 1 nút tròn + label trạng thái + waveform nhỏ, không có transcript/chat log
  * mặc định. Nền có 1 quầng sáng mờ (glow) đổi màu theo trạng thái, đặt phía sau orb. */
-export function CallView({ onOpenSettings }: CallViewProps) {
+export function CallView() {
   useCallLifecycle();
 
   const settings = useSettingsStore((s) => s.settings);
@@ -41,17 +38,20 @@ export function CallView({ onOpenSettings }: CallViewProps) {
       />
 
       <header className="relative z-10 flex items-center justify-between px-6 py-5">
-        <span className="text-sm font-medium tracking-wide text-foreground/60">voxta</span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="rounded-full"
-          onClick={onOpenSettings}
+        <Link
+          href="/"
+          className={buttonVariants({ variant: 'ghost', size: 'icon', className: 'rounded-full' })}
+          aria-label="Về Conversation"
+        >
+          <ArrowLeft className="size-5" />
+        </Link>
+        <Link
+          href="/settings"
+          className={buttonVariants({ variant: 'ghost', size: 'icon', className: 'rounded-full' })}
           aria-label="Cài đặt"
         >
           <Settings className="size-5" />
-        </Button>
+        </Link>
       </header>
 
       <main className="relative z-10 flex flex-1 flex-col items-center justify-center gap-8 px-6 pb-16">

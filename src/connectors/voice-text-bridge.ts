@@ -80,6 +80,15 @@ function extractCompleteSentences(text: string): { sentences: string[]; rest: st
  * VAD (dựa trên audio) và STT (dựa trên ngôn ngữ) không tuyệt đối đồng bộ với nhau. */
 const VAD_COMMIT_GRACE_MS = 250;
 
+/** Event có cấu trúc mà subclass phát ra NGOÀI text trả lời chính (Conversation view hiển thị,
+ * pipeline Live/TTS bỏ qua — chỉ đọc to phần `onDelta` text) — hiện chỉ Claude Code phát loại
+ * event này thật (Hermes/Tmux chỉ có text). */
+export type AssistantStreamEvent =
+  | { type: 'thinking-delta'; text: string }
+  | { type: 'tool-call-start'; id: string; name: string }
+  | { type: 'tool-call-input'; id: string; input: unknown }
+  | { type: 'tool-result'; id: string; output: unknown };
+
 export interface VoiceTextBridgeConfig {
   /** Ngôn ngữ cho SpeechRecognition/SpeechSynthesis (BCP-47), vd "vi-VN". */
   language: string;
@@ -256,11 +265,27 @@ export abstract class VoiceTextBridgeConnector implements VoiceBackendConnector 
 
   /** Subclass gọi API thật (Hermes Gateway, Claude Code CLI qua route nội bộ...) cho `userText`,
    * gọi `onDelta` mỗi khi có thêm chữ mới của câu trả lời. Phải resolve sau khi model nói xong
-   * lượt này (không cần trả về gì — bridge tự quản lý phần đọc/hàng đợi TTS). */
+   * lượt này (không cần trả về gì — bridge tự quản lý phần đọc/hàng đợi TTS). `onEvent` optional —
+   * chỉ Claude Code dùng để phát thinking/tool-call/tool-result (Conversation view); pipeline Live
+   * ở trên gọi `fetchAssistantReply` KHÔNG truyền `onEvent`, nên các event này tự động bị bỏ qua
+   * lúc đang gọi thoại (không đọc to nội dung thinking/tool ra loa). */
   protected abstract fetchAssistantReply(
     userText: string,
     onDelta: (delta: string) => void,
+    onEvent?: (event: AssistantStreamEvent) => void,
   ): Promise<void>;
+
+  /** Gửi 1 tin nhắn TEXT thuần cho chat gõ tay (Conversation view) — KHÔNG qua mic/VAD/TTS, không
+   * cần `connect()` trước (không đụng STT/VAD nội bộ ở trên). Dùng chung `fetchAssistantReply` với
+   * pipeline Live vì phần gọi API thật của subclass vốn đã độc lập với voice — chỉ khác là ở đây
+   * `onDelta`/`onEvent` đi thẳng ra caller thay vì bị bridge nuốt vào hàng đợi TTS. */
+  async sendTextMessage(
+    userText: string,
+    onDelta: (delta: string) => void,
+    onEvent?: (event: AssistantStreamEvent) => void,
+  ): Promise<void> {
+    await this.fetchAssistantReply(userText, onDelta, onEvent);
+  }
 
   private enqueueSpeech(text: string): void {
     const trimmed = text.trim();
