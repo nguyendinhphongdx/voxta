@@ -39,7 +39,7 @@ export function ConversationView() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="flex items-center justify-between border-b px-4 py-3">
+      <header className="flex items-center justify-between border-b px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <span className="text-sm font-medium tracking-wide text-foreground/60">voxta</span>
         <div className="flex items-center gap-2">
           <Link href="/settings" className={buttonVariants({ variant: 'ghost', size: 'icon' })} aria-label="Cài đặt">
@@ -69,7 +69,7 @@ export function ConversationView() {
 
       {canChat && (
         <form
-          className="mx-auto flex w-full max-w-2xl items-center gap-2 border-t px-4 py-3"
+          className="mx-auto flex w-full max-w-2xl items-center gap-2 border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
           onSubmit={(e) => {
             e.preventDefault();
             void handleSend();

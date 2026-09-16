@@ -37,7 +37,7 @@ export function CallView() {
         style={{ backgroundColor: `var(${colorVar})` }}
       />
 
-      <header className="relative z-10 flex items-center justify-between px-6 py-5">
+      <header className="relative z-10 flex items-center justify-between px-6 py-5 pt-[max(1.25rem,env(safe-area-inset-top))]">
         <Link
           href="/"
           className={buttonVariants({ variant: 'ghost', size: 'icon', className: 'rounded-full' })}
@@ -54,7 +54,7 @@ export function CallView() {
         </Link>
       </header>
 
-      <main className="relative z-10 flex flex-1 flex-col items-center justify-center gap-8 px-6 pb-16">
+      <main className="relative z-10 flex flex-1 flex-col items-center justify-center gap-8 px-6 pb-[max(4rem,env(safe-area-inset-bottom))]">
         <CallOrb visual={visual} active={isBusy} onClick={isBusy ? stop : () => void start(settings)} />
         <VoiceWave visual={visual} />
         <span
