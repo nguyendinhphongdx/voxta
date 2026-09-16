@@ -15,9 +15,18 @@ export interface HermesBackendConfig {
 }
 
 interface ChatMessage {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
 }
+
+/** Dặn model đừng dùng markdown vì trả lời sẽ được đọc thành giọng nói — sửa từ gốc thay vì
+ * dọn markdown bằng code sau khi nhận (xem `voice-text-bridge.ts`'s `sanitizeForSpeech`, vẫn giữ
+ * làm lưới an toàn cho lúc model không theo đúng chỉ dẫn). */
+const VOICE_SYSTEM_NOTE =
+  'Bạn đang trả lời bằng giọng nói qua cuộc gọi thoại — câu trả lời sẽ được đọc lên bằng TTS. ' +
+  'Trả lời bằng câu văn nói tự nhiên, ngắn gọn. KHÔNG dùng markdown (không **đậm**, không ' +
+  'heading #, không bullet -, không code block ```). Nếu cần nhắc tới code, mô tả bằng lời thay ' +
+  'vì dán nguyên đoạn code.';
 
 /** Connector cho Hermes Agent (Gateway API OpenAI-compatible, thuần HTTP text-in/text-out).
  * Không có voice model native nên toàn bộ STT/VAD/TTS do `VoiceTextBridgeConnector` lo — phần
@@ -26,7 +35,7 @@ interface ChatMessage {
  * delta. */
 export class HermesConnector extends VoiceTextBridgeConnector {
   private readonly hermesConfig: HermesBackendConfig;
-  private history: ChatMessage[] = [];
+  private history: ChatMessage[] = [{ role: 'system', content: VOICE_SYSTEM_NOTE }];
 
   constructor(config: HermesBackendConfig) {
     super({ language: config.language, ttsProvider: config.ttsProvider });

@@ -39,6 +39,28 @@ function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+/** Bỏ hẳn code block ```...``` khỏi text trước khi đọc — đọc code thô bằng giọng nói vô nghĩa.
+ * Chỉ khớp block ĐÃ ĐÓNG (```...``` trọn vẹn) — 1 fence mở dở dang (stream chưa tới đoạn đóng) cố
+ * tình không khớp, ở lại trong buffer chờ delta sau, tránh cắt ngang code block giữa chừng. */
+function stripClosedCodeBlocks(text: string): string {
+  return text.replace(/```[\s\S]*?```/g, ' (đoạn code). ');
+}
+
+/** Bỏ markdown inline phổ biến (đậm/nghiêng/inline-code/link/heading/bullet) — đọc nguyên ký hiệu
+ * `**`/`` ` ``/`[]()`/`#`/`- ` lên nghe rất kỳ. Áp dụng cho từng CÂU đã cắt xong (không phải cả
+ * buffer đang stream) vì các ký hiệu này luôn nằm trọn trong 1 câu. */
+function sanitizeForSpeech(text: string): string {
+  return text
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^[-*+]\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .trim();
+}
+
 /** Tách các câu ĐÃ hoàn chỉnh (kết thúc bằng . ! ? … theo sau khoảng trắng thật — không tính hết
  * chuỗi hiện tại là "hoàn chỉnh" vì stream có thể tiếp tục ở delta kế tiếp) ra khỏi phần đuôi còn
  * dang dở. Dùng để đọc từng câu ngay khi có, thay vì chờ hết cả câu trả lời mới đọc. */
@@ -220,13 +242,13 @@ export abstract class VoiceTextBridgeConnector implements VoiceBackendConnector 
     await this.fetchAssistantReply(userText, (delta) => {
       if (!delta) return;
       this.emit({ type: 'transcript-delta', role: 'model', text: delta });
-      sentenceBuffer += delta;
+      sentenceBuffer = stripClosedCodeBlocks(sentenceBuffer + delta);
       const { sentences, rest } = extractCompleteSentences(sentenceBuffer);
       sentenceBuffer = rest;
-      for (const sentence of sentences) this.enqueueSpeech(sentence);
+      for (const sentence of sentences) this.enqueueSpeech(sanitizeForSpeech(sentence));
     });
 
-    this.enqueueSpeech(sentenceBuffer); // câu cuối thường không có khoảng trắng theo sau
+    this.enqueueSpeech(sanitizeForSpeech(sentenceBuffer)); // câu cuối thường không có khoảng trắng theo sau
     // Reply rỗng hoàn toàn (không câu nào được enqueue) — không gì kích hoạt resumeListening
     // qua drainSpeechQueue nữa, phải tự gọi.
     if (!this.speaking && this.speechQueue.length === 0) this.resumeListening();

@@ -35,6 +35,16 @@ interface ClaudeCodeLine {
  * chọn của người dùng) — nghĩa là Claude Code có thể sửa file/chạy lệnh thật trong project đã cấu
  * hình mà KHÔNG hỏi xác nhận, chỉ dựa trên văn bản STT nhận diện được từ giọng nói. Rủi ro cao hơn
  * hẳn Hermes (chỉ trả lời text) nếu STT nghe nhầm. */
+/** Dặn model đừng dùng markdown vì trả lời sẽ được đọc thành giọng nói — sửa từ gốc thay vì dọn
+ * markdown bằng code sau khi nhận (xem `voice-text-bridge.ts`'s `sanitizeForSpeech`, vẫn giữ làm
+ * lưới an toàn cho lúc model không theo đúng chỉ dẫn). Chỉ cần chèn 1 lần lúc bắt đầu session —
+ * `--resume` giữ nguyên ngữ cảnh nên các lượt sau không cần lặp lại. */
+const VOICE_SYSTEM_NOTE =
+  '[Bạn đang trả lời bằng giọng nói qua cuộc gọi thoại — mọi câu trả lời từ giờ trong session này ' +
+  'sẽ được đọc lên bằng TTS. Trả lời bằng câu văn nói tự nhiên, ngắn gọn. KHÔNG dùng markdown ' +
+  '(không **đậm**, không heading #, không bullet -, không code block ```). Nếu cần nhắc tới code, ' +
+  'mô tả bằng lời thay vì dán nguyên đoạn code.]\n\n';
+
 export class ClaudeCodeConnector extends VoiceTextBridgeConnector {
   private sessionId: string | null = null;
 
@@ -46,10 +56,13 @@ export class ClaudeCodeConnector extends VoiceTextBridgeConnector {
     userText: string,
     onDelta: (delta: string) => void,
   ): Promise<void> {
+    const isFirstTurn = !this.sessionId;
+    const prompt = isFirstTurn ? VOICE_SYSTEM_NOTE + userText : userText;
+
     const res = await fetch('/api/claude-code/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: userText, sessionId: this.sessionId }),
+      body: JSON.stringify({ text: prompt, sessionId: this.sessionId }),
     });
     if (!res.ok || !res.body) {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
