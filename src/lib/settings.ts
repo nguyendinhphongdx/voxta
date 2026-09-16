@@ -3,7 +3,7 @@
  * bộ giữa các browser/thiết bị cùng trỏ vào 1 server voxta. */
 
 export interface VoxtaSettings {
-  backend: 'ultron' | 'hermes';
+  backend: 'ultron' | 'hermes' | 'claude-code';
   apiBaseUrl: string;
   agentId: number | null;
   /** Base URL của Hermes Gateway API (OpenAI-compatible), vd http://localhost:8642. */
@@ -12,9 +12,12 @@ export interface VoxtaSettings {
   hermesApiKey: string;
   /** Tên model Hermes route tới — để trống dùng mặc định server. */
   hermesModel: string;
-  /** Giọng đọc trả lời của HermesConnector — 'browser' dùng SpeechSynthesis miễn phí có sẵn
-   * trong trình duyệt (chất lượng thấp); 'openai'/'google' gọi TTS thật qua proxy server
-   * (`/api/tts`) để key không lộ ra browser. */
+  /** Thư mục project Claude Code CLI sẽ chạy trong đó (đọc/sửa file, chạy lệnh thật — xem cảnh
+   * báo ở `/api/claude-code/chat/route.ts`). */
+  claudeCodeProjectDir: string;
+  /** Giọng đọc trả lời — dùng chung cho các backend chỉ có text (Hermes, Claude Code). 'browser'
+   * dùng SpeechSynthesis miễn phí có sẵn trong trình duyệt (chất lượng thấp); 'openai'/'google'
+   * gọi TTS thật qua proxy server (`/api/tts`) để key không lộ ra browser. */
   ttsProvider: 'browser' | 'openai' | 'google';
   openaiApiKey: string;
   openaiTtsModel: string;
@@ -32,6 +35,7 @@ export const DEFAULT_SETTINGS: VoxtaSettings = {
   hermesGatewayUrl: 'http://localhost:8642',
   hermesApiKey: '',
   hermesModel: '',
+  claudeCodeProjectDir: '',
   ttsProvider: 'browser',
   openaiApiKey: '',
   openaiTtsModel: 'gpt-4o-mini-tts',

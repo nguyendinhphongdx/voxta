@@ -1,3 +1,4 @@
+import { ClaudeCodeConnector } from './claude-code/ClaudeCodeConnector';
 import { HermesConnector } from './hermes/HermesConnector';
 import { UltronConnector } from './ultron/UltronConnector';
 import type { VoiceBackendConnector } from './types';
@@ -11,6 +12,13 @@ export function createConnector(settings: VoxtaSettings): VoiceBackendConnector 
       gatewayUrl: settings.hermesGatewayUrl,
       apiKey: settings.hermesApiKey,
       model: settings.hermesModel,
+      language: 'vi-VN',
+      ttsProvider: settings.ttsProvider,
+    });
+  }
+  if (settings.backend === 'claude-code') {
+    return new ClaudeCodeConnector({
+      projectDir: settings.claudeCodeProjectDir,
       language: 'vi-VN',
       ttsProvider: settings.ttsProvider,
     });

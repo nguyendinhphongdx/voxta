@@ -12,12 +12,14 @@ chỉ một trải nghiệm gọi thoại tối giản, đứng trước nhiều
 - **1 nút, 3 trạng thái** — nghe / nghĩ / nói, thể hiện bằng orb phát sáng đổi màu + waveform,
   không cần giao diện chat.
 - **Backend-agnostic** — cùng 1 giao diện, đổi qua lại giữa nhiều agent platform mà không đổi UI.
-- **Hai backend đã hỗ trợ**:
+- **Ba backend đã hỗ trợ**:
   - **Ultron** — relay đầy đủ qua WebSocket, backend tự giữ kết nối Gemini Live.
   - **Hermes Agent** — chỉ có Gateway API dạng text (OpenAI-compatible), nên voxta tự lo toàn bộ
     voice pipeline ở client: nhận diện giọng nói, phát hiện lúc dừng nói bằng VAD thật (không phải
     đếm giờ), và đọc trả lời — có thể chọn giữa giọng miễn phí của trình duyệt hoặc TTS thật
     (OpenAI, Google Cloud).
+  - **Claude Code** — điều khiển 1 project code thật bằng giọng nói: server chạy `claude -p`
+    headless như subprocess, voxta nói lại kết quả. Dùng chung voice pipeline với Hermes.
 - **Trả lời được đọc theo từng câu ngay khi model sinh ra** (streaming), audio của câu kế tiếp
   được tải trước trong lúc câu hiện tại đang phát — không có khoảng lặng chờ mạng giữa các câu.
 - **Cấu hình dùng chung mọi thiết bị** — lưu SQLite phía server thay vì `localStorage`, nên mở
@@ -47,9 +49,11 @@ src/
 │
 ├── connectors/                # Backend-agnostic voice pipeline
 │   ├── types.ts               #   VoiceBackendConnector — interface chung mọi backend implement
+│   ├── voice-text-bridge.ts   #   base dùng chung cho backend chỉ có text (STT/VAD/TTS/hàng đợi)
 │   ├── create-connector.ts    #   factory: settings -> connector cụ thể
 │   ├── ultron/                #   relay đầy đủ qua WebSocket
-│   └── hermes/                #   Web Speech STT/TTS + Silero VAD + streaming reply
+│   ├── hermes/                #   HermesConnector — Gateway API OpenAI-compatible
+│   └── claude-code/           #   ClaudeCodeConnector — gọi `claude` CLI qua route nội bộ
 │
 ├── audio/                     # Mic capture (AudioWorklet) + playback streaming — dùng cho Ultron
 ├── components/ui/             # shadcn/ui primitives
@@ -62,8 +66,9 @@ src/
   thật — `CallView` không biết Ultron hay Hermes làm gì bên trong, chỉ gọi qua interface này. Thêm
   backend mới chỉ cần viết 1 connector + thêm 1 case vào `create-connector.ts`.
 - Connector có cờ **`managesOwnAudio`**: Ultron dùng chung `MicCapture`/`AudioPlayer` của voxta;
-  Hermes tự giữ mic/loa riêng (Web Speech API + Silero VAD) vì không có voice model native — hai
-  connector không tranh nhau quyền truy cập mic.
+  Hermes và Claude Code tự giữ mic/loa riêng (Web Speech API + Silero VAD, qua
+  `VoiceTextBridgeConnector`) vì không có voice model native — các connector không tranh nhau
+  quyền truy cập mic.
 - **State quản lý bằng Zustand** (`useCallStore`, `useSettingsStore`) — không prop-drilling qua
   nhiều tầng component.
 - Mọi màu trạng thái cuộc gọi (nghe/nghĩ/nói/lỗi) là **design token** (`--voice-*` trong
@@ -105,7 +110,25 @@ Cần Gateway API của Hermes đang chạy (`docker compose up -d` trong `tools
 | API Server Key | **lưu ý**: key thật nằm trong `data/.env` **bên trong container** (`docker exec hermes-agent printenv API_SERVER_KEY`) — khác file `tools/hermes-agent/.env` dùng để cấu hình docker-compose |
 | Model | vd `hermes-agent`, để trống dùng mặc định server |
 
-**Giọng đọc trả lời** (chỉ áp dụng cho Hermes — Ultron dùng thẳng voice model của Gemini Live):
+### Cấu hình Claude Code
+
+Cần [Claude Code CLI](https://claude.com/claude-code) đã cài và đăng nhập trên máy chạy voxta
+(`claude` phải nằm trong `PATH` của process chạy `pnpm dev`/`pnpm start`).
+
+| Field | Ghi chú |
+|---|---|
+| Project Directory | thư mục Claude Code sẽ chạy trong đó — bắt buộc, không có mặc định |
+
+> **⚠️ Cảnh báo**: backend này chạy `claude -p` với `--dangerously-skip-permissions` — Claude Code
+> có thể sửa file, chạy lệnh thật trong Project Directory **không cần xác nhận**, chỉ dựa trên văn
+> bản STT nhận diện được từ giọng nói. Nghe nhầm 1 câu có thể vô tình kích hoạt 1 thao tác không
+> mong muốn. Chỉ trỏ vào project bạn chấp nhận rủi ro đó, và cân nhắc dùng git để dễ revert nếu cần.
+
+Mỗi lượt nói là 1 lần gọi `claude -p` mới; lịch sử hội thoại trong **cùng 1 cuộc gọi** được nối
+bằng `--resume <session-id>` (session mới cho mỗi lần bấm nút gọi lại).
+
+**Giọng đọc trả lời** (chung cho Hermes và Claude Code — Ultron dùng thẳng voice model của Gemini
+Live):
 
 - **Trình duyệt** (mặc định) — miễn phí, dùng `SpeechSynthesis` có sẵn, chất lượng thấp.
 - **OpenAI TTS** — cần API key từ [platform.openai.com](https://platform.openai.com/api-keys).
@@ -115,9 +138,10 @@ Cần Gateway API của Hermes đang chạy (`docker compose up -d` trong `tools
 
 ## Giới hạn hiện tại
 
-- Backend Hermes chỉ chạy tốt trên **Chrome/Edge** (Web Speech API không được Safari/Firefox hỗ
-  trợ đầy đủ).
+- Backend Hermes và Claude Code chỉ chạy tốt trên **Chrome/Edge** (Web Speech API không được
+  Safari/Firefox hỗ trợ đầy đủ).
 - VAD (`@ricky0123/vad-web`) tải model ONNX từ CDN lúc bắt đầu cuộc gọi — cần Internet ở bước đó,
   khác các phần còn lại của voxta vốn chạy được hoàn toàn trong mạng LAN.
-- Hermes chưa hỗ trợ barge-in (ngắt lời model đang đọc) — mic tạm dừng trong lúc TTS phát để tránh
-  tự bắt lại tiếng loa của chính nó.
+- Không backend nào hỗ trợ barge-in (ngắt lời model đang đọc) — mic tạm dừng trong lúc TTS phát để
+  tránh tự bắt lại tiếng loa của chính nó.
+- Claude Code chạy với `--dangerously-skip-permissions` — xem cảnh báo ở phần cấu hình phía trên.

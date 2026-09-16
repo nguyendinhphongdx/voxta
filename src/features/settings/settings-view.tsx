@@ -19,6 +19,7 @@ interface SettingsViewProps {
 const BACKEND_LABEL: Record<VoxtaSettings['backend'], string> = {
   ultron: 'Ultron',
   hermes: 'Hermes Agent',
+  'claude-code': 'Claude Code',
 };
 
 const TTS_PROVIDER_LABEL: Record<VoxtaSettings['ttsProvider'], string> = {
@@ -63,6 +64,7 @@ export function SettingsView({ onClose }: SettingsViewProps) {
   const [hermesGatewayUrl, setHermesGatewayUrl] = useState(settings.hermesGatewayUrl);
   const [hermesApiKey, setHermesApiKey] = useState(settings.hermesApiKey);
   const [hermesModel, setHermesModel] = useState(settings.hermesModel);
+  const [claudeCodeProjectDir, setClaudeCodeProjectDir] = useState(settings.claudeCodeProjectDir);
   const [ttsProvider, setTtsProvider] = useState(settings.ttsProvider);
   const [openaiApiKey, setOpenaiApiKey] = useState(settings.openaiApiKey);
   const [openaiTtsModel, setOpenaiTtsModel] = useState(settings.openaiTtsModel);
@@ -87,6 +89,7 @@ export function SettingsView({ onClose }: SettingsViewProps) {
       hermesGatewayUrl: hermesGatewayUrl.trim().replace(/\/$/, ''),
       hermesApiKey: hermesApiKey.trim(),
       hermesModel: hermesModel.trim(),
+      claudeCodeProjectDir: claudeCodeProjectDir.trim(),
       ttsProvider,
       openaiApiKey: openaiApiKey.trim(),
       openaiTtsModel,
@@ -120,11 +123,12 @@ export function SettingsView({ onClose }: SettingsViewProps) {
               <SelectContent>
                 <SelectItem value="ultron">Ultron</SelectItem>
                 <SelectItem value="hermes">Hermes Agent</SelectItem>
+                <SelectItem value="claude-code">Claude Code</SelectItem>
               </SelectContent>
             </Select>
           </SettingsField>
 
-          {backend === 'ultron' ? (
+          {backend === 'ultron' && (
             <>
               <SettingsField label="Ultron API URL">
                 <Input value={apiBaseUrl} onChange={(e) => setApiBaseUrl(e.target.value)} placeholder="http://localhost:8000" />
@@ -134,7 +138,9 @@ export function SettingsView({ onClose }: SettingsViewProps) {
                 <Input value={agentId} onChange={(e) => setAgentId(e.target.value)} placeholder="vd: 3" inputMode="numeric" />
               </SettingsField>
             </>
-          ) : (
+          )}
+
+          {backend === 'hermes' && (
             <>
               <SettingsField label="Hermes Gateway URL">
                 <Input
@@ -156,7 +162,29 @@ export function SettingsView({ onClose }: SettingsViewProps) {
               <SettingsField label="Model (để trống = mặc định server)">
                 <Input value={hermesModel} onChange={(e) => setHermesModel(e.target.value)} placeholder="vd: hermes-4" />
               </SettingsField>
+            </>
+          )}
 
+          {backend === 'claude-code' && (
+            <>
+              <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                Claude Code sẽ chạy với quyền bỏ qua mọi xác nhận (
+                <code>--dangerously-skip-permissions</code>) — có thể sửa file, chạy lệnh thật
+                trong thư mục dưới đây chỉ dựa trên giọng nói bạn nhận diện được. Chỉ trỏ vào
+                project bạn chấp nhận rủi ro đó.
+              </p>
+              <SettingsField label="Project Directory">
+                <Input
+                  value={claudeCodeProjectDir}
+                  onChange={(e) => setClaudeCodeProjectDir(e.target.value)}
+                  placeholder="/Users/ban/Code/du-an"
+                />
+              </SettingsField>
+            </>
+          )}
+
+          {(backend === 'hermes' || backend === 'claude-code') && (
+            <>
               <div className="border-t pt-5">
                 <SettingsField label="Giọng đọc trả lời">
                   <Select
