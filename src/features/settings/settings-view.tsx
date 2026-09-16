@@ -65,6 +65,7 @@ export function SettingsView({ onClose }: SettingsViewProps) {
   const [hermesApiKey, setHermesApiKey] = useState(settings.hermesApiKey);
   const [hermesModel, setHermesModel] = useState(settings.hermesModel);
   const [claudeCodeProjectDir, setClaudeCodeProjectDir] = useState(settings.claudeCodeProjectDir);
+  const [claudeCodeBinaryPath, setClaudeCodeBinaryPath] = useState(settings.claudeCodeBinaryPath);
   const [ttsProvider, setTtsProvider] = useState(settings.ttsProvider);
   const [openaiApiKey, setOpenaiApiKey] = useState(settings.openaiApiKey);
   const [openaiTtsModel, setOpenaiTtsModel] = useState(settings.openaiTtsModel);
@@ -90,6 +91,7 @@ export function SettingsView({ onClose }: SettingsViewProps) {
       hermesApiKey: hermesApiKey.trim(),
       hermesModel: hermesModel.trim(),
       claudeCodeProjectDir: claudeCodeProjectDir.trim(),
+      claudeCodeBinaryPath: claudeCodeBinaryPath.trim() || 'claude',
       ttsProvider,
       openaiApiKey: openaiApiKey.trim(),
       openaiTtsModel,
@@ -178,6 +180,13 @@ export function SettingsView({ onClose }: SettingsViewProps) {
                   value={claudeCodeProjectDir}
                   onChange={(e) => setClaudeCodeProjectDir(e.target.value)}
                   placeholder="/Users/ban/Code/du-an"
+                />
+              </SettingsField>
+              <SettingsField label="Đường dẫn claude CLI (để trống = tự dò)">
+                <Input
+                  value={claudeCodeBinaryPath}
+                  onChange={(e) => setClaudeCodeBinaryPath(e.target.value)}
+                  placeholder="claude"
                 />
               </SettingsField>
             </>

@@ -1,8 +1,6 @@
 import { VoiceTextBridgeConnector } from '../voice-text-bridge';
 
 export interface ClaudeCodeBackendConfig {
-  /** Thư mục project Claude Code sẽ chạy (đọc/sửa file, chạy lệnh) trong đó. */
-  projectDir: string;
   /** Ngôn ngữ cho SpeechRecognition/SpeechSynthesis (BCP-47), vd "vi-VN". */
   language: string;
   /** 'browser' đọc bằng SpeechSynthesis miễn phí có sẵn (chất lượng thấp); 'openai'/'google' gọi
@@ -30,19 +28,18 @@ interface ClaudeCodeLine {
  * Toàn bộ STT/VAD/TTS do `VoiceTextBridgeConnector` lo; phần riêng ở đây chỉ là gọi route nội bộ
  * và parse đúng NDJSON event schema thật của Claude Code (`content_block_delta` cho text streaming
  * theo token, `system/init` cho session_id lần đầu) để nối lại lịch sử qua `--resume` ở các lượt
- * sau trong CÙNG 1 cuộc gọi.
+ * sau trong CÙNG 1 cuộc gọi. `projectDir`/đường dẫn binary đọc từ Settings NGAY TRONG route phía
+ * server (giống `/api/tts` đọc key phía server) — connector không cần biết/gửi các giá trị đó.
  *
  * CẢNH BÁO: route phía server chạy Claude Code với `--dangerously-skip-permissions` (theo lựa
- * chọn của người dùng) — nghĩa là Claude Code có thể sửa file/chạy lệnh thật trong `projectDir`
- * mà KHÔNG hỏi xác nhận, chỉ dựa trên văn bản STT nhận diện được từ giọng nói. Rủi ro cao hơn hẳn
- * Hermes (chỉ trả lời text) nếu STT nghe nhầm. */
+ * chọn của người dùng) — nghĩa là Claude Code có thể sửa file/chạy lệnh thật trong project đã cấu
+ * hình mà KHÔNG hỏi xác nhận, chỉ dựa trên văn bản STT nhận diện được từ giọng nói. Rủi ro cao hơn
+ * hẳn Hermes (chỉ trả lời text) nếu STT nghe nhầm. */
 export class ClaudeCodeConnector extends VoiceTextBridgeConnector {
-  private readonly ccConfig: ClaudeCodeBackendConfig;
   private sessionId: string | null = null;
 
   constructor(config: ClaudeCodeBackendConfig) {
     super({ language: config.language, ttsProvider: config.ttsProvider });
-    this.ccConfig = config;
   }
 
   protected async fetchAssistantReply(
@@ -52,11 +49,7 @@ export class ClaudeCodeConnector extends VoiceTextBridgeConnector {
     const res = await fetch('/api/claude-code/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: userText,
-        sessionId: this.sessionId,
-        projectDir: this.ccConfig.projectDir,
-      }),
+      body: JSON.stringify({ text: userText, sessionId: this.sessionId }),
     });
     if (!res.ok || !res.body) {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;

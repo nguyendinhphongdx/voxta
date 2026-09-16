@@ -15,6 +15,11 @@ export interface VoxtaSettings {
   /** Thư mục project Claude Code CLI sẽ chạy trong đó (đọc/sửa file, chạy lệnh thật — xem cảnh
    * báo ở `/api/claude-code/chat/route.ts`). */
   claudeCodeProjectDir: string;
+  /** Lệnh/đường dẫn chạy `claude` CLI — mặc định "claude" (tra theo PATH của process chạy
+   * server). Process server có thể có PATH khác hẳn terminal tương tác của bạn (vd cài qua nvm —
+   * PATH của nvm chỉ được set qua rc file của shell tương tác, process không tương tác/không qua
+   * shell login sẽ không thấy) — nếu vậy điền đường dẫn tuyệt đối (`which claude` để lấy). */
+  claudeCodeBinaryPath: string;
   /** Giọng đọc trả lời — dùng chung cho các backend chỉ có text (Hermes, Claude Code). 'browser'
    * dùng SpeechSynthesis miễn phí có sẵn trong trình duyệt (chất lượng thấp); 'openai'/'google'
    * gọi TTS thật qua proxy server (`/api/tts`) để key không lộ ra browser. */
@@ -36,6 +41,7 @@ export const DEFAULT_SETTINGS: VoxtaSettings = {
   hermesApiKey: '',
   hermesModel: '',
   claudeCodeProjectDir: '',
+  claudeCodeBinaryPath: 'claude',
   ttsProvider: 'browser',
   openaiApiKey: '',
   openaiTtsModel: 'gpt-4o-mini-tts',

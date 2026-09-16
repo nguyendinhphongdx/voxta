@@ -17,11 +17,7 @@ export function createConnector(settings: VoxtaSettings): VoiceBackendConnector 
     });
   }
   if (settings.backend === 'claude-code') {
-    return new ClaudeCodeConnector({
-      projectDir: settings.claudeCodeProjectDir,
-      language: 'vi-VN',
-      ttsProvider: settings.ttsProvider,
-    });
+    return new ClaudeCodeConnector({ language: 'vi-VN', ttsProvider: settings.ttsProvider });
   }
   return new UltronConnector({ apiBaseUrl: settings.apiBaseUrl, agentId: settings.agentId });
 }
