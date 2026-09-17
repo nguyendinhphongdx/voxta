@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { extractLatestReply, sendMessage, sessionExists, waitForStableScreen } from '../../../../lib/tmux-agent';
+import { capture, extractLatestReply, sendMessage, sessionExists, waitForStableScreen } from '../../../../lib/tmux-agent';
 
 export const runtime = 'nodejs';
 
@@ -24,11 +24,14 @@ export async function POST(request: Request) {
     );
   }
 
+  // Chụp màn hình TRƯỚC khi gửi — cần cho fallback diff của agent không có glyph prompt riêng (vd
+  // shell thường qua SSH, xem `extractByDiffingScreens` trong lib/tmux-agent.ts).
+  const beforeScreen = await capture(sessionName);
   await sendMessage(sessionName, text);
   // KHÔNG streaming theo token thật được (xem lib/tmux-agent.ts) — chờ cả lượt xong rồi trả 1
   // cục, bridge dùng chung vẫn tự cắt câu/đọc tuần tự như bình thường từ đó.
   const screen = await waitForStableScreen(sessionName);
-  const reply = extractLatestReply(screen, text);
+  const reply = extractLatestReply(screen, text, beforeScreen);
 
   return NextResponse.json({ reply });
 }
