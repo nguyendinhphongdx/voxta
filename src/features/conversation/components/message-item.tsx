@@ -1,5 +1,16 @@
 import type { ConversationMessage, MessagePart } from '../types';
 
+function ThinkingIndicator() {
+  return (
+    <span className="thinking-indicator" role="status" aria-live="polite">
+      <span className="sr-only">Đang suy nghĩ</span>
+      {[0, 1, 2].map((index) => (
+        <span key={index} className="thinking-indicator-dot" aria-hidden="true" />
+      ))}
+    </span>
+  );
+}
+
 function PartView({ part }: { part: MessagePart }) {
   switch (part.type) {
     case 'text':
@@ -44,7 +55,7 @@ export function MessageItem({ message }: MessageItemProps) {
         }`}
       >
         {message.parts.length === 0 && message.status === 'streaming' ? (
-          <span className="text-muted-foreground">···</span>
+          <ThinkingIndicator />
         ) : (
           message.parts.map((part, i) => <PartView key={i} part={part} />)
         )}
