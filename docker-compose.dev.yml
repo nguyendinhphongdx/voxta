@@ -1,0 +1,7 @@
+# Override thêm port ra host — dùng cùng base để test/dev local:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+# Không dùng file này khi chạy production sau reverse proxy/Tailscale (xem docker-compose.yml).
+services:
+  app:
+    ports:
+      - '3000:3000'

@@ -13,6 +13,8 @@ dist-ssr
 *.local
 .next
 data/
+# Key SSH riêng cho container Docker (xem scripts/docker-ssh-setup.sh) — không bao giờ commit.
+.docker/
 next-env.d.ts
 *.tsbuildinfo
 .claude/scheduled_tasks.lock

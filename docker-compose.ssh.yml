@@ -1,0 +1,10 @@
+# Mount SSH key (tạo qua scripts/docker-ssh-setup.sh) cho backend "Terminal Agent (tmux)" SSH
+# ngược ra máy host chạy `claude`/`codex` đã đăng nhập sẵn — dùng KÈM base + dev khi cần:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.ssh.yml up -d
+# .docker/ssh/ đã gitignore — không commit key thật.
+services:
+  app:
+    volumes:
+      - ./.docker/ssh:/home/voxta/.ssh:ro
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'

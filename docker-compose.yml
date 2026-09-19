@@ -1,0 +1,21 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: voxta:latest
+    container_name: voxta
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    volumes:
+      # Settings (SQLite, xem src/lib/db.ts) sống sót qua recreate/rebuild container.
+      - voxta-data:/app/data
+    # KHÔNG publish port ra host ở base — dùng behind reverse proxy (Caddy/Traefik) hoặc Tailscale
+    # Funnel/Serve trỏ vào network Docker này (service name "app", port 3000). Muốn mở port ra
+    # localhost để test/dev, chạy kèm docker-compose.dev.yml (xem README).
+    expose:
+      - '3000'
+
+volumes:
+  voxta-data:
