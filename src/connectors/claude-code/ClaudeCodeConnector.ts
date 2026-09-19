@@ -7,6 +7,10 @@ export interface ClaudeCodeBackendConfig {
   /** 'browser' đọc bằng SpeechSynthesis miễn phí có sẵn (chất lượng thấp); 'openai'/'google' gọi
    * TTS thật qua proxy server `/api/tts` (key không lộ ra browser — xem route đó). */
   ttsProvider: 'browser' | 'openai' | 'google';
+  /** Session muốn TIẾP TỤC (chọn qua UI, xem `/api/claude-code/sessions/route.ts`) thay vì bắt đầu
+   * mới — để trống/undefined = phiên mới. Chỉ quyết định `--resume` cho LƯỢT ĐẦU của connector này;
+   * sau đó connector tự dùng session nó (hoặc session được resume) tạo ra. */
+  initialSessionId?: string;
 }
 
 /** 1 dòng NDJSON thật từ `claude -p ... --output-format stream-json --include-partial-messages`
@@ -67,10 +71,17 @@ const VOICE_SYSTEM_NOTE =
   'mô tả bằng lời thay vì dán nguyên đoạn code.]\n\n';
 
 export class ClaudeCodeConnector extends VoiceTextBridgeConnector {
-  private sessionId: string | null = null;
+  private sessionId: string | null;
+  /** Tách riêng khỏi `sessionId` — khi TIẾP TỤC 1 session cũ (`initialSessionId` khác `--resume`
+   * lần đầu tự tạo ra), `sessionId` đã có giá trị NGAY LƯỢT ĐẦU, nhưng session đó chưa chắc từng
+   * nhận `VOICE_SYSTEM_NOTE` (vd tạo từ CLI tương tác bình thường, không qua voxta) — vẫn cần chèn
+   * lời dặn "đang trả lời bằng giọng nói" vào lượt đầu tiên CỦA CONNECTOR NÀY, bất kể đang resume
+   * hay tạo mới. */
+  private hasSentFirstPrompt = false;
 
   constructor(config: ClaudeCodeBackendConfig) {
     super({ language: config.language, ttsProvider: config.ttsProvider });
+    this.sessionId = config.initialSessionId?.trim() || null;
   }
 
   protected async fetchAssistantReply(
@@ -78,8 +89,9 @@ export class ClaudeCodeConnector extends VoiceTextBridgeConnector {
     onDelta: (delta: string) => void,
     onEvent?: (event: AssistantStreamEvent) => void,
   ): Promise<void> {
-    const isFirstTurn = !this.sessionId;
-    const prompt = isFirstTurn ? VOICE_SYSTEM_NOTE + userText : userText;
+    const isFirstPrompt = !this.hasSentFirstPrompt;
+    this.hasSentFirstPrompt = true;
+    const prompt = isFirstPrompt ? VOICE_SYSTEM_NOTE + userText : userText;
 
     const res = await fetch('/api/claude-code/chat', {
       method: 'POST',

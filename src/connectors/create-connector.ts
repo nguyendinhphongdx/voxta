@@ -19,7 +19,11 @@ export function createConnector(settings: VoxtaSettings): VoiceBackendConnector 
     });
   }
   if (settings.backend === 'claude-code') {
-    return new ClaudeCodeConnector({ language: 'vi-VN', ttsProvider: settings.ttsProvider });
+    return new ClaudeCodeConnector({
+      language: 'vi-VN',
+      ttsProvider: settings.ttsProvider,
+      initialSessionId: settings.claudeCodeSessionId,
+    });
   }
   if (settings.backend === 'tmux-agent') {
     return new TmuxAgentConnector({ language: 'vi-VN', ttsProvider: settings.ttsProvider });

@@ -20,6 +20,12 @@ export interface VoxtaSettings {
    * PATH của nvm chỉ được set qua rc file của shell tương tác, process không tương tác/không qua
    * shell login sẽ không thấy) — nếu vậy điền đường dẫn tuyệt đối (`which claude` để lấy). */
   claudeCodeBinaryPath: string;
+  /** Session Claude Code muốn TIẾP TỤC (thay vì bắt đầu mới) — để trống = phiên mới, `--resume`
+   * không dùng. Chọn qua UI (danh sách đọc từ `~/.claude/projects/<projectDir>/*.jsonl` — xem
+   * `/api/claude-code/sessions/route.ts`) thay vì gõ tay UUID. Chỉ áp dụng cho LƯỢT ĐẦU TIÊN của 1
+   * connector mới — sau đó connector tự `--resume` bằng session nó vừa tạo ra, không quay lại đọc
+   * field này nữa (xem `ClaudeCodeConnector`). */
+  claudeCodeSessionId: string;
   /** Lệnh khởi động agent trong tmux — generic, không giới hạn Claude Code (vd "codex" hay
    * "claude"). Khác `claudeCodeBinaryPath`: đây chạy TƯƠNG TÁC trong 1 pane thật, đọc bằng cách
    * chụp màn hình (`lib/tmux-agent.ts`), không phải gọi flag JSON riêng như backend Claude Code
@@ -59,6 +65,7 @@ export const DEFAULT_SETTINGS: VoxtaSettings = {
   hermesModel: '',
   claudeCodeProjectDir: '',
   claudeCodeBinaryPath: 'claude',
+  claudeCodeSessionId: '',
   tmuxAgentCommand: 'codex',
   tmuxAgentProjectDir: '',
   remoteTerminalRelayUrl: '',
