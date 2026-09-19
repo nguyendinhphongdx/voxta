@@ -4,6 +4,7 @@ import { ArrowLeft, Settings } from 'lucide-react';
 import Link from 'next/link';
 
 import { buttonVariants } from '../../components/ui/button';
+import { unlockAudioPlayback } from '../../lib/unlock-audio-playback';
 import { useSettingsStore } from '../settings/store';
 import { CallOrb } from '../call/components/call-orb';
 import { VoiceWave } from '../call/components/voice-wave';
@@ -59,7 +60,18 @@ export function LiveTerminalView() {
 
       <main className="relative z-10 flex min-h-0 flex-1 flex-col gap-6 overflow-hidden px-6 pb-[max(2rem,env(safe-area-inset-bottom))] lg:flex-row lg:items-stretch lg:gap-8">
         <div className="flex shrink-0 flex-col items-center justify-center gap-6 lg:flex-1">
-          <CallOrb visual={visual} active={isBusy} onClick={isBusy ? stop : () => void start(settings)} />
+          <CallOrb
+            visual={visual}
+            active={isBusy}
+            onClick={
+              isBusy
+                ? stop
+                : () => {
+                    unlockAudioPlayback();
+                    void start(settings);
+                  }
+            }
+          />
           <VoiceWave visual={visual} />
           <span
             className="rounded-full border px-4 py-1.5 text-sm font-medium transition-colors duration-300"

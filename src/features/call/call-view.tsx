@@ -4,6 +4,7 @@ import { ArrowLeft, Settings } from 'lucide-react';
 import Link from 'next/link';
 
 import { buttonVariants } from '../../components/ui/button';
+import { unlockAudioPlayback } from '../../lib/unlock-audio-playback';
 import { useSettingsStore } from '../settings/store';
 import { CallOrb } from './components/call-orb';
 import { VoiceWave } from './components/voice-wave';
@@ -55,7 +56,18 @@ export function CallView() {
       </header>
 
       <main className="relative z-10 flex flex-1 flex-col items-center justify-center gap-8 px-6 pb-[max(4rem,env(safe-area-inset-bottom))]">
-        <CallOrb visual={visual} active={isBusy} onClick={isBusy ? stop : () => void start(settings)} />
+        <CallOrb
+          visual={visual}
+          active={isBusy}
+          onClick={
+            isBusy
+              ? stop
+              : () => {
+                  unlockAudioPlayback();
+                  void start(settings);
+                }
+          }
+        />
         <VoiceWave visual={visual} />
         <span
           className="rounded-full border px-4 py-1.5 text-sm font-medium transition-colors duration-300"
