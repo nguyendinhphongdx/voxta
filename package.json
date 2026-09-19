@@ -1,6 +1,6 @@
 {
   "name": "@hanoilab/voxta",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Voice-first client cho các agent platform tự host (Ultron, Hermes, Claude Code, terminal từ xa)",
   "license": "MIT",
   "repository": {
