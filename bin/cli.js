@@ -358,7 +358,7 @@ function cmdUninstall() {
 
 function cmdUpgrade() {
   const target = args[0] || 'latest';
-  const pkg = 'voxta';
+  const pkg = '@hanoilab/voxta';
   console.log(`Upgrading ${pkg} to ${target}...`);
 
   const wasRunning = isRunning();
@@ -432,7 +432,7 @@ function cmdPurge() {
 
   console.log('Uninstalling voxta globally...');
   try {
-    execSync('npm uninstall -g voxta', { stdio: 'inherit' });
+    execSync('npm uninstall -g @hanoilab/voxta', { stdio: 'inherit' });
   } catch {
     console.log('Could not uninstall package (may not be installed globally).');
   }
