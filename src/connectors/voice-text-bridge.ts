@@ -1,5 +1,6 @@
 import { MicVAD } from '@ricky0123/vad-web';
 
+import { pauseSharedAudio, playAudioBlob } from '../lib/unlock-audio-playback';
 import type { VoiceBackendConnector, VoiceEvent } from './types';
 
 // Pin đúng version — asset (model ONNX + wasm) tải từ CDN jsdelivr theo version này, lệch
@@ -120,7 +121,6 @@ export abstract class VoiceTextBridgeConnector implements VoiceBackendConnector 
   private micVad: MicVAD | null = null;
   private shouldListen = false;
   private closed = false;
-  private activeAudio: HTMLAudioElement | null = null;
   private pendingTranscript = '';
   /** Hàng đợi câu chờ phát — mỗi câu vào hàng đợi là bắt đầu fetch TTS NGAY (không chờ tới lượt
    * phát), nên khi câu trước phát xong, audio câu sau thường đã sẵn sàng — không có khoảng lặng
@@ -377,14 +377,12 @@ export abstract class VoiceTextBridgeConnector implements VoiceBackendConnector 
     return res.blob();
   }
 
+  /** Dùng LẠI đúng 1 phần tử `<audio>` singleton (xem `lib/unlock-audio-playback.ts`) thay vì tạo
+   * `new Audio()` mỗi câu — Safari/iOS chỉ mở khoá autoplay cho phần tử được `.play()` lúc còn
+   * trong user gesture; tạo phần tử mới sau đó mất hẳn trạng thái mở khoá (đã tái hiện thật: giọng
+   * "Trình duyệt" nghe được, "OpenAI"/"Google" thì câm — đúng dấu hiệu của lỗi này). */
   private playBlob(blob: Blob): Promise<void> {
-    return new Promise((resolve) => {
-      const audio = new Audio(URL.createObjectURL(blob));
-      audio.onended = () => resolve();
-      audio.onerror = () => resolve();
-      this.activeAudio = audio;
-      void audio.play().catch(() => resolve());
-    });
+    return playAudioBlob(blob);
   }
 
   private playBrowserUtterance(text: string): Promise<void> {
@@ -422,8 +420,7 @@ export abstract class VoiceTextBridgeConnector implements VoiceBackendConnector 
     this.speechQueue = [];
     this.speaking = false;
     window.speechSynthesis.cancel();
-    this.activeAudio?.pause();
-    this.activeAudio = null;
+    pauseSharedAudio();
     this.recognition?.stop();
     this.recognition = null;
     this.micVad?.destroy();
