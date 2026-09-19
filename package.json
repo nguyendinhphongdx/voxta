@@ -1,24 +1,34 @@
 {
   "name": "voxta",
-  "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "Voice-first client cho các agent platform tự host (Ultron, Hermes, Claude Code, terminal từ xa)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nguyendinhphongdx/voxta.git"
+  },
   "type": "module",
   "packageManager": "pnpm@10.14.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "voxta": "./bin/cli.js"
+  },
+  "files": [
+    "bin",
+    ".next/standalone"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "oxlint",
+    "prepare:standalone": "./scripts/prepare-standalone.sh",
+    "cli": "node bin/cli.js",
     "docker:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build",
     "docker:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down",
-    "docker:logs": "docker compose logs -f app",
-    "native:build": "./scripts/build-native.sh",
-    "native:start": "./scripts/voxta-ctl.sh start",
-    "native:stop": "./scripts/voxta-ctl.sh stop",
-    "native:restart": "./scripts/voxta-ctl.sh restart",
-    "native:status": "./scripts/voxta-ctl.sh status",
-    "native:logs": "./scripts/voxta-ctl.sh logs -f",
-    "native:install-service": "./scripts/install-native-service.sh"
+    "docker:logs": "docker compose logs -f app"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

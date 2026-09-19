@@ -17,6 +17,9 @@ data/
 .docker/
 next-env.d.ts
 *.tsbuildinfo
+# Output của `npm pack` lúc test đóng gói cục bộ (xem scripts/prepare-standalone.sh) — publish thật
+# đi qua GitHub Actions (.github/workflows/publish.yml), không commit tarball vào git.
+voxta-*.tgz
 .claude/scheduled_tasks.lock
 
 # Editor directories and files

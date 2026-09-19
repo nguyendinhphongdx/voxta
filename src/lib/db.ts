@@ -5,8 +5,14 @@ import Database from 'better-sqlite3';
 
 /** SQLite dùng chung cho toàn bộ config voxta — thay localStorage (mỗi browser 1 bản riêng,
  * không đồng bộ). File nằm ngoài git (data/ gitignored); voxta 1 user duy nhất nên 1 hàng
- * key-value đơn giản là đủ, không cần schema quan hệ. */
-const DB_PATH = path.join(process.cwd(), 'data', 'voxta.db');
+ * key-value đơn giản là đủ, không cần schema quan hệ.
+ *
+ * Mặc định `<cwd>/data` — đúng cho Docker (WORKDIR /app) và chạy native từ trong thư mục repo
+ * (`scripts/voxta-ctl.sh` luôn `cd` vào repo trước khi chạy). Cài qua `bin/cli.js` (global npm
+ * package) thì KHÔNG có "thư mục repo" nào để đứng vào — cwd lúc gõ `voxta start` là bất kỳ đâu —
+ * nên `cli.js` tự set `VOXTA_DATA_DIR=~/.voxta/data` trước khi spawn server, ghi đè mặc định này. */
+const DATA_DIR = process.env.VOXTA_DATA_DIR || path.join(process.cwd(), 'data');
+const DB_PATH = path.join(DATA_DIR, 'voxta.db');
 
 let db: Database.Database | null = null;
 
