@@ -1,5 +1,11 @@
 # @hanoilab/voxta
 
+## 0.2.0
+
+### Minor Changes
+
+- 3628323: Lưu lịch sử hội thoại (chế độ gõ chat) vào SQLite — xem/mở lại/xoá qua trang `/conversations`, URL `?c=<id>` là nguồn sự thật (F5, back/forward, bookmark đều đúng hội thoại đang xem).
+
 ## 0.1.1
 
 ### Patch Changes
