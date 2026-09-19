@@ -30,7 +30,7 @@
     "prepare:standalone": "./scripts/prepare-standalone.sh",
     "cli": "node bin/cli.js",
     "changeset": "changeset",
-    "version": "changeset version",
+    "version-packages": "changeset version",
     "release": "pnpm build && ./scripts/prepare-standalone.sh && changeset publish",
     "docker:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build",
     "docker:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down",

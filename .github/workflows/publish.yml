@@ -35,10 +35,16 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Version packages (bump + CHANGELOG.md, gộp mọi changeset đang chờ)
+        # `pnpm version` (không "run") là lệnh BUILT-IN của pnpm (in bảng version của pnpm/node/
+        # dependency, giống `npm version` không tham số) — KHÔNG chạy script "version" tự định
+        # nghĩa trong package.json. Đã tái hiện thật: package.json chưa bao giờ được bump, dù job
+        # này "pass" (exit 0) bình thường vì lệnh built-in đó vẫn chạy thành công, chỉ là làm sai
+        # việc. Gọi thẳng `npx changeset version`, không qua alias "version" mập mờ giữa pnpm và
+        # script tự định nghĩa.
         run: |
           git config user.email "voxta-ci@users.noreply.github.com"
           git config user.name "voxta CI"
-          pnpm version
+          npx changeset version
           git add -A
           git diff --cached --quiet || git commit -m "ci: version packages [skip ci]"
           git push origin HEAD:main
