@@ -29,17 +29,22 @@ cp -R public .next/standalone/public
 mkdir -p .next/standalone/.next
 cp -R .next/static .next/standalone/.next/static
 
-REAL_DIR=$(find .next/standalone/node_modules/.pnpm -maxdepth 1 -iname "better-sqlite3@*" 2>/dev/null | head -1)
+# Lấy bản gốc từ node_modules/.pnpm CỦA REPO (đầy đủ prebuilds mọi nền tảng), KHÔNG lấy từ
+# .next/standalone/node_modules/.pnpm — bản đó là chính bản Next.js đã tự trace/copy, và trace này
+# tự nó đã thiếu sẵn 1 số file .node theo nền tảng (vd đã tái hiện thật: thiếu darwin-arm64.node dù
+# máy build là Apple Silicon) nên dùng làm nguồn "real" thì chỉ copy lại đúng cái thiếu đó.
+REAL_DIR=$(find node_modules/.pnpm -maxdepth 1 -iname "better-sqlite3@*" 2>/dev/null | head -1)
 if [ -n "$REAL_DIR" ]; then
   HASHED_NAMES=$(grep -rhoE "better-sqlite3-[a-f0-9]+" .next/standalone/.next/server --include="*.nft.json" 2>/dev/null | sort -u || true)
   for name in $HASHED_NAMES; do
-    if [ ! -e ".next/standalone/node_modules/$name" ]; then
-      # COPY thật, KHÔNG symlink — `npm pack`/`publish` âm thầm bỏ qua mọi symlink lúc đóng gói
-      # tarball (đã tái hiện thật: symlink còn nguyên trên đĩa nhưng biến mất trong .tgz, khiến bản
-      # cài global lại lỗi y hệt dù build local chạy đúng). Tốn thêm vài MB nhưng sống sót qua pack.
-      cp -R "$REAL_DIR/node_modules/better-sqlite3" ".next/standalone/node_modules/$name"
-      echo "Đã tạo node_modules/$name (fix bug trace/copy thiếu module native của Next.js)."
-    fi
+    # Luôn ghi đè bằng bản gốc đầy đủ, kể cả khi Next.js đã tự tạo sẵn thư mục này (thư mục đó
+    # chính là bản thiếu file cần fix).
+    rm -rf ".next/standalone/node_modules/$name"
+    # COPY thật, KHÔNG symlink — `npm pack`/`publish` âm thầm bỏ qua mọi symlink lúc đóng gói
+    # tarball (đã tái hiện thật: symlink còn nguyên trên đĩa nhưng biến mất trong .tgz, khiến bản
+    # cài global lại lỗi y hệt dù build local chạy đúng). Tốn thêm vài MB nhưng sống sót qua pack.
+    cp -R "$REAL_DIR/node_modules/better-sqlite3" ".next/standalone/node_modules/$name"
+    echo "Đã tạo node_modules/$name (fix bug trace/copy thiếu module native của Next.js)."
   done
 fi
 

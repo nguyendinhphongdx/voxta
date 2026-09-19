@@ -1,6 +1,6 @@
 'use client';
 
-import { Mic, SettingsIcon } from 'lucide-react';
+import { History, Mic, SettingsIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
@@ -15,6 +15,7 @@ import { useConversationStore } from './store';
  * độ giao tiếp mở qua nút mic (route `/live`), không còn là màn hình duy nhất như trước. */
 export function ConversationView() {
   const settings = useSettingsStore((s) => s.settings);
+  const currentId = useConversationStore((s) => s.currentId);
   const messages = useConversationStore((s) => s.messages);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -24,6 +25,23 @@ export function ConversationView() {
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
+
+  // Tự lưu xuống DB mỗi khi hội thoại đổi — debounce để không gọi API trên từng token streaming.
+  useEffect(() => {
+    if (!currentId || messages.length === 0) return;
+    const timer = setTimeout(() => {
+      const firstText = messages
+        .find((m) => m.role === 'user')
+        ?.parts.find((p) => p.type === 'text')?.text;
+      const title = (firstText ?? 'Hội thoại mới').slice(0, 80);
+      void fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentId, title, messages }),
+      });
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [currentId, messages]);
 
   const handleSend = async () => {
     const text = draft.trim();
@@ -45,6 +63,13 @@ export function ConversationView() {
       <header className="flex items-center justify-between border-b px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <span className="text-sm font-medium tracking-wide text-foreground/60">voxta</span>
         <div className="flex items-center gap-2">
+          <Link
+            href="/conversations"
+            className={buttonVariants({ variant: 'ghost', size: 'icon' })}
+            aria-label="Lịch sử hội thoại"
+          >
+            <History className="size-4" />
+          </Link>
           <Link href="/settings" className={buttonVariants({ variant: 'ghost', size: 'icon' })} aria-label="Cài đặt">
             <SettingsIcon className="size-4" />
           </Link>

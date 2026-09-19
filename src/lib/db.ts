@@ -24,8 +24,53 @@ function getDb(): Database.Database {
   instance.exec(
     'CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY CHECK (id = 1), data TEXT NOT NULL)',
   );
+  instance.exec(
+    `CREATE TABLE IF NOT EXISTS conversations (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      messages TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`,
+  );
   db = instance;
   return instance;
+}
+
+export interface ConversationRow {
+  id: string;
+  title: string;
+  messages: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export function listConversations(): Omit<ConversationRow, 'messages'>[] {
+  return getDb()
+    .prepare('SELECT id, title, created_at, updated_at FROM conversations ORDER BY updated_at DESC')
+    .all() as Omit<ConversationRow, 'messages'>[];
+}
+
+export function readConversation(id: string): ConversationRow | null {
+  const row = getDb().prepare('SELECT * FROM conversations WHERE id = ?').get(id) as
+    | ConversationRow
+    | undefined;
+  return row ?? null;
+}
+
+export function upsertConversation(row: { id: string; title: string; messages: string }): void {
+  const now = Date.now();
+  getDb()
+    .prepare(
+      `INSERT INTO conversations (id, title, messages, created_at, updated_at)
+       VALUES (@id, @title, @messages, @now, @now)
+       ON CONFLICT(id) DO UPDATE SET title = @title, messages = @messages, updated_at = @now`,
+    )
+    .run({ ...row, now });
+}
+
+export function deleteConversation(id: string): void {
+  getDb().prepare('DELETE FROM conversations WHERE id = ?').run(id);
 }
 
 export function readSettingsJson(): string | null {

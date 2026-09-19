@@ -3,6 +3,9 @@ import { create } from 'zustand';
 import type { ConversationMessage } from './types';
 
 interface ConversationStore {
+  /** id hội thoại đang lưu xuống DB — tạo mới (crypto.randomUUID) ngay khi có tin nhắn đầu tiên,
+   * hoặc gán sẵn khi mở lại 1 hội thoại cũ từ màn danh sách (`/conversations`). */
+  currentId: string | null;
   messages: ConversationMessage[];
   addUserMessage: (text: string) => string;
   startAssistantMessage: () => string;
@@ -14,6 +17,8 @@ interface ConversationStore {
   finishMessage: (messageId: string) => void;
   failMessage: (messageId: string, error: string) => void;
   clear: () => void;
+  /** Nạp lại 1 hội thoại đã lưu (mở từ `/conversations`). */
+  load: (id: string, messages: ConversationMessage[]) => void;
 }
 
 let idCounter = 0;
@@ -25,11 +30,13 @@ function nextId(): string {
 /** Store message dùng chung toàn app — chat gõ text (`agent-session.ts`) và Live call
  * (`features/call/store.ts`) đều ghi vào đây, Conversation view chỉ đọc từ 1 nguồn duy nhất. */
 export const useConversationStore = create<ConversationStore>((set) => ({
+  currentId: null,
   messages: [],
 
   addUserMessage: (text) => {
     const id = nextId();
     set((s) => ({
+      currentId: s.currentId ?? crypto.randomUUID(),
       messages: [
         ...s.messages,
         { id, role: 'user', parts: [{ type: 'text', text }], status: 'done', createdAt: Date.now() },
@@ -130,5 +137,7 @@ export const useConversationStore = create<ConversationStore>((set) => ({
     }));
   },
 
-  clear: () => set({ messages: [] }),
+  clear: () => set({ currentId: null, messages: [] }),
+
+  load: (id, messages) => set({ currentId: id, messages }),
 }));
