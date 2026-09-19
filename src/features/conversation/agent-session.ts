@@ -24,9 +24,37 @@ function isTextSendable(connector: VoiceBackendConnector): connector is VoiceBac
   return typeof (connector as Partial<TextSendable>).sendTextMessage === 'function';
 }
 
-/** Ultron thuần voice (Gemini Live), không có API text nào để gõ chat — chỉ dùng được qua Live. */
+/** Duck-type cho connector hỗ trợ terminal tương tác trực tiếp (hiện chỉ `RemoteTerminalConnector`
+ * — xem `connectTerminal`/`onRawOutput`/`writeRaw`/`resizeTerminal` ở đó). Exported vì
+ * `features/call/store.ts` cần check này để lấy "tay cầm" điều khiển terminal của connector Live
+ * đang sống, cho panel xterm.js ở `/live-terminal` (không tạo connector riêng như
+ * `TextSendable`/`sendTextMessage`). */
+export interface TerminalCapable {
+  connectTerminal(): Promise<void>;
+  onRawOutput(handler: (chunk: string) => void): () => void;
+  writeRaw(data: string): Promise<void>;
+  resizeTerminal(cols: number, rows: number): void;
+  setAutoReadOutput(enabled: boolean): void;
+}
+
+export function isTerminalCapable(
+  connector: VoiceBackendConnector,
+): connector is VoiceBackendConnector & TerminalCapable {
+  const c = connector as Partial<TerminalCapable>;
+  return (
+    typeof c.setAutoReadOutput === 'function' &&
+    typeof c.connectTerminal === 'function' &&
+    typeof c.onRawOutput === 'function' &&
+    typeof c.writeRaw === 'function' &&
+    typeof c.resizeTerminal === 'function'
+  );
+}
+
+/** Ultron thuần voice (Gemini Live) không có API text để gõ chat; remote-terminal thì có API
+ * nhưng cố tình tắt — backend này dùng qua giọng nói + xem output ở `/live-terminal`, gõ text
+ * lẫn vào không hợp trải nghiệm "nói chuyện với terminal". Cả 2 chỉ dùng được qua Live. */
 export function supportsTextChat(settings: VoxtaSettings): boolean {
-  return settings.backend !== 'ultron';
+  return settings.backend !== 'ultron' && settings.backend !== 'remote-terminal';
 }
 
 /** Gửi 1 tin nhắn gõ tay, ghi thẳng vào `useConversationStore` — không đụng tới mic/mic

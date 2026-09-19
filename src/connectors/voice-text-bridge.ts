@@ -287,6 +287,23 @@ export abstract class VoiceTextBridgeConnector implements VoiceBackendConnector 
     await this.fetchAssistantReply(userText, onDelta, onEvent);
   }
 
+  /** Cho subclass "đọc to" 1 đoạn text KHÔNG gắn với 1 lượt hỏi-đáp cụ thể qua
+   * `fetchAssistantReply`/`handleUserUtterance` (vd `RemoteTerminalConnector` muốn đọc output xuất
+   * hiện do gõ tay trực tiếp vào terminal tương tác, hoặc từ tiến trình chạy nền — không phải trả
+   * lời cho 1 câu hỏi vừa hỏi). Tạm dừng mic/STT trong lúc đọc, y hệt lý do `handleUserUtterance`
+   * làm vậy — tránh bắt lại chính tiếng TTS đang phát rồi hiểu nhầm thành câu nói mới của người
+   * dùng. Nối thẳng vào hàng đợi phát đã có sẵn — `drainSpeechQueue` tự `resumeListening()` khi
+   * đọc xong, không cần subclass tự lo. */
+  protected speak(text: string): void {
+    const trimmed = text.trim();
+    if (!trimmed || this.closed) return;
+    this.shouldListen = false;
+    this.recognition?.stop();
+    this.micVad?.pause();
+    this.emit({ type: 'transcript-delta', role: 'model', text: trimmed });
+    this.enqueueSpeech(sanitizeForSpeech(trimmed));
+  }
+
   private enqueueSpeech(text: string): void {
     const trimmed = text.trim();
     if (!trimmed) return;

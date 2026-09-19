@@ -3,6 +3,7 @@ import type { ComponentType } from 'react';
 import type { VoxtaSettings } from '../../../../lib/settings';
 import { ClaudeCodeFields } from './claude-code-fields';
 import { HermesFields } from './hermes-fields';
+import { RemoteTerminalFields } from './remote-terminal-fields';
 import { TmuxAgentFields } from './tmux-agent-fields';
 import { UltronFields } from './ultron-fields';
 import type { BackendFieldsProps } from './types';
@@ -17,4 +18,5 @@ export const BACKEND_FIELDS: Record<VoxtaSettings['backend'], ComponentType<Back
   hermes: HermesFields,
   'claude-code': ClaudeCodeFields,
   'tmux-agent': TmuxAgentFields,
+  'remote-terminal': RemoteTerminalFields,
 };

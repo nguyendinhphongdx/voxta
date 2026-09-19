@@ -7,6 +7,7 @@ export const BACKEND_LABEL: Record<VoxtaSettings['backend'], string> = {
   hermes: 'Hermes Agent',
   'claude-code': 'Claude Code',
   'tmux-agent': 'Terminal Agent (tmux)',
+  'remote-terminal': 'Terminal Remote (relay)',
 };
 
 interface BackendSelectProps {

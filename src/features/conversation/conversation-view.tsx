@@ -37,27 +37,44 @@ export function ConversationView() {
     }
   };
 
+  const isRemoteTerminal = settings.backend === 'remote-terminal';
+  const liveHref = isRemoteTerminal ? '/live-terminal' : '/live';
+
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex h-screen flex-col">
       <header className="flex items-center justify-between border-b px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <span className="text-sm font-medium tracking-wide text-foreground/60">voxta</span>
         <div className="flex items-center gap-2">
           <Link href="/settings" className={buttonVariants({ variant: 'ghost', size: 'icon' })} aria-label="Cài đặt">
             <SettingsIcon className="size-4" />
           </Link>
-          <Link href="/live" className={buttonVariants({ variant: 'default', size: 'icon' })} aria-label="Chế độ Live">
+          <Link href={liveHref} className={buttonVariants({ variant: 'default', size: 'icon' })} aria-label="Chế độ Live">
             <Mic className="size-4" />
           </Link>
         </div>
       </header>
 
-      <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4">
+      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 ? (
-          <p className="mx-auto mt-10 max-w-sm text-center text-sm text-muted-foreground">
-            {canChat
-              ? 'Gõ tin nhắn bên dưới, hoặc bấm nút mic để chuyển sang chế độ Live (nói chuyện bằng giọng nói).'
-              : 'Backend này chỉ giao tiếp bằng giọng nói — bấm nút mic để bắt đầu.'}
-          </p>
+          canChat ? (
+            <p className="mx-auto mt-10 max-w-sm text-center text-sm text-muted-foreground">
+              Gõ tin nhắn bên dưới, hoặc bấm nút mic để chuyển sang chế độ Live (nói chuyện bằng giọng nói).
+            </p>
+          ) : isRemoteTerminal ? (
+            <div className="mx-auto mt-10 flex max-w-sm flex-col items-center gap-3 text-center">
+              <p className="text-sm text-muted-foreground">
+                Backend này điều khiển terminal từ xa bằng giọng nói — mở Live Terminal để nói chuyện và xem output.
+              </p>
+              <Link href="/live-terminal" className={buttonVariants({ variant: 'default' })}>
+                <Mic className="size-4" />
+                Mở Live Terminal
+              </Link>
+            </div>
+          ) : (
+            <p className="mx-auto mt-10 max-w-sm text-center text-sm text-muted-foreground">
+              Backend này chỉ giao tiếp bằng giọng nói — bấm nút mic để bắt đầu.
+            </p>
+          )
         ) : (
           <div className="mx-auto flex max-w-2xl flex-col gap-4">
             {messages.map((m) => (

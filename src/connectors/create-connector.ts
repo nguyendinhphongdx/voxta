@@ -1,5 +1,6 @@
 import { ClaudeCodeConnector } from './claude-code/ClaudeCodeConnector';
 import { HermesConnector } from './hermes/HermesConnector';
+import { RemoteTerminalConnector } from './remote-terminal/RemoteTerminalConnector';
 import { TmuxAgentConnector } from './tmux-agent/TmuxAgentConnector';
 import { UltronConnector } from './ultron/UltronConnector';
 import type { VoiceBackendConnector } from './types';
@@ -22,6 +23,15 @@ export function createConnector(settings: VoxtaSettings): VoiceBackendConnector 
   }
   if (settings.backend === 'tmux-agent') {
     return new TmuxAgentConnector({ language: 'vi-VN', ttsProvider: settings.ttsProvider });
+  }
+  if (settings.backend === 'remote-terminal') {
+    return new RemoteTerminalConnector({
+      relayUrl: settings.remoteTerminalRelayUrl,
+      machineId: settings.remoteTerminalMachineId,
+      password: settings.remoteTerminalPassword,
+      language: 'vi-VN',
+      ttsProvider: settings.ttsProvider,
+    });
   }
   return new UltronConnector({ apiBaseUrl: settings.apiBaseUrl, agentId: settings.agentId });
 }

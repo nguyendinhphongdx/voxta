@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 
 import './globals.css';
 
+import { OtpPromptDialog } from '../features/conversation/components/otp-prompt-dialog';
 import { RegisterServiceWorker } from './register-service-worker';
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="vi" className={cn('dark font-sans', geist.variable)}>
       <body>
         {children}
+        <OtpPromptDialog />
         <RegisterServiceWorker />
       </body>
     </html>

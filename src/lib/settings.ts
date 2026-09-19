@@ -3,7 +3,7 @@
  * bộ giữa các browser/thiết bị cùng trỏ vào 1 server voxta. */
 
 export interface VoxtaSettings {
-  backend: 'ultron' | 'hermes' | 'claude-code' | 'tmux-agent';
+  backend: 'ultron' | 'hermes' | 'claude-code' | 'tmux-agent' | 'remote-terminal';
   apiBaseUrl: string;
   agentId: number | null;
   /** Base URL của Hermes Gateway API (OpenAI-compatible), vd http://localhost:8642. */
@@ -28,6 +28,15 @@ export interface VoxtaSettings {
   tmuxAgentCommand: string;
   /** Thư mục project agent trong tmux sẽ chạy trong đó. */
   tmuxAgentProjectDir: string;
+  /** URL relay của vscode-remote (vd https://your-relay.example.com) — voxta là 1 client "browser"
+   * nữa nói cùng giao thức WebSocket, dùng CHUNG relay/agent đã cài cho vscode-remote, không tự
+   * vận hành relay riêng. Xem `connectors/remote-terminal/RemoteTerminalConnector.ts`. */
+  remoteTerminalRelayUrl: string;
+  /** Machine ID của agent (hiện trong `opencode status` trên máy đích). */
+  remoteTerminalMachineId: string;
+  /** Password đăng nhập agent — nếu agent bật 2FA, voxta sẽ hỏi mã OTP ngay lúc bắt đầu phiên
+   * (không lưu OTP/TOTP secret trong Settings). */
+  remoteTerminalPassword: string;
   /** Giọng đọc trả lời — dùng chung cho các backend chỉ có text (Hermes, Claude Code). 'browser'
    * dùng SpeechSynthesis miễn phí có sẵn trong trình duyệt (chất lượng thấp); 'openai'/'google'
    * gọi TTS thật qua proxy server (`/api/tts`) để key không lộ ra browser. */
@@ -52,6 +61,9 @@ export const DEFAULT_SETTINGS: VoxtaSettings = {
   claudeCodeBinaryPath: 'claude',
   tmuxAgentCommand: 'codex',
   tmuxAgentProjectDir: '',
+  remoteTerminalRelayUrl: '',
+  remoteTerminalMachineId: '',
+  remoteTerminalPassword: '',
   ttsProvider: 'browser',
   openaiApiKey: '',
   openaiTtsModel: 'gpt-4o-mini-tts',
