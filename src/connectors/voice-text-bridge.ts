@@ -180,6 +180,23 @@ export abstract class VoiceTextBridgeConnector implements VoiceBackendConnector 
       // "no-speech"/"aborted" là chuyện bình thường của chế độ continuous (im lặng quá lâu,
       // hay do chính mình gọi stop() để tạm dừng khi TTS đọc) — onend lo việc khởi động lại.
       if (event.error === 'no-speech' || event.error === 'aborted') return;
+      // "not-allowed"/"service-not-allowed" trên Safari/WebKit KHÔNG phải do từ chối quyền mic —
+      // `webkitSpeechRecognition` tồn tại trên Safari (nên getSpeechRecognitionCtor() ở trên tưởng
+      // dùng được) nhưng chưa bao giờ thật sự hoạt động, luôn lỗi này ngay khi start() — đã tái
+      // hiện thật, xác nhận đây là giới hạn nền tảng (mọi trình duyệt trên iOS đều chạy trên
+      // WebKit, kể cả Chrome/Firefox-trên-iOS chỉ là vỏ bọc Safari), không phải lỗi cấu hình hay
+      // quyền truy cập có thể sửa được từ phía voxta. Thông báo rõ nguyên nhân thay vì mã lỗi kỹ
+      // thuật khó hiểu.
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        this.emit({
+          type: 'error',
+          message:
+            'Trình duyệt này không hỗ trợ nhận diện giọng nói thật (giới hạn của Safari/WebKit — ' +
+            'ảnh hưởng MỌI trình duyệt trên iOS, không riêng Safari). Dùng chế độ gõ chat ở trang ' +
+            'chủ thay vì Live, hoặc mở voxta bằng Chrome/Edge trên máy tính/Android.',
+        });
+        return;
+      }
       this.emit({ type: 'error', message: `Lỗi nhận dạng giọng nói: ${event.error}` });
     };
     recognition.onend = () => {
