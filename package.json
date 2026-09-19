@@ -11,7 +11,14 @@
     "lint": "oxlint",
     "docker:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build",
     "docker:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down",
-    "docker:logs": "docker compose logs -f app"
+    "docker:logs": "docker compose logs -f app",
+    "native:build": "./scripts/build-native.sh",
+    "native:start": "./scripts/voxta-ctl.sh start",
+    "native:stop": "./scripts/voxta-ctl.sh stop",
+    "native:restart": "./scripts/voxta-ctl.sh restart",
+    "native:status": "./scripts/voxta-ctl.sh status",
+    "native:logs": "./scripts/voxta-ctl.sh logs -f",
+    "native:install-service": "./scripts/install-native-service.sh"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
