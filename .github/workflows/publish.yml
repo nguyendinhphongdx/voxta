@@ -10,6 +10,10 @@ on:
       - main
     paths:
       - ".changeset/**"
+  # Chạy tay qua "Run workflow" trên GitHub — cần khi đã có changeset đang chờ nhưng lần push gần
+  # nhất không đổi gì trong .changeset/ (vd chỉ sửa workflow này) nên paths filter ở trên không tự
+  # kích hoạt.
+  workflow_dispatch: {}
 
 permissions:
   contents: write
